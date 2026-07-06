@@ -20,14 +20,14 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <main className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-800 dark:text-slate-100 transition-colors duration-300">
-        <Loader2 className="animate-spin text-indigo-500" size={40} />
+      <main className="min-h-screen bg-(--bg) flex items-center justify-center text-(--text-primary) transition-colors duration-300">
+        <Loader2 className="animate-spin text-(--primary)" size={40} />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans relative overflow-x-hidden transition-colors duration-300">
+    <main className="min-h-screen bg-(--bg) text-(--text-primary) font-sans relative overflow-x-hidden transition-colors duration-300">
       {/* Toast Notification Container */}
       <Toast />
 

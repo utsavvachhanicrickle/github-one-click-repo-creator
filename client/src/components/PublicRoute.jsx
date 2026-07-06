@@ -7,8 +7,8 @@ export default function PublicRoute({ children }) {
 
   if (authLoading) {
     return (
-      <main className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-800 dark:text-slate-100 transition-colors duration-300">
-        <Loader2 className="animate-spin text-indigo-500" size={40} />
+      <main className="min-h-screen bg-(--bg) flex items-center justify-center text-(--text-primary) transition-colors duration-300">
+        <Loader2 className="animate-spin text-(--primary)" size={40} />
       </main>
     );
   }
