@@ -1,0 +1,130 @@
+{
+  "name": "RepoCreator Integrated Webhooks Flow with GitHub Fetching",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "get-user-repos",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        100
+      ],
+      "id": "webhook-get-repos",
+      "name": "Webhook - Get User Repos"
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/user/repos",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.body.accessToken }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n"
+            }
+          ]
+        },
+        "sendQueryParameters": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "sort",
+              "value": "updated"
+            },
+            {
+              "name": "per_page",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        100,
+        100
+      ],
+      "id": "fetch-github-repos",
+      "name": "Fetch GitHub Repos"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const r = item.json;\n  return {\n    json: {\n      name: r.name,\n      html_url: r.html_url,\n      private: r.private,\n      description: r.description,\n      updated_at: r.updated_at\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 12,
+      "position": [
+        400,
+        100
+      ],
+      "id": "format-repos-code",
+      "name": "Format Repos for Backend"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        100
+      ],
+      "id": "webhook-response-repos",
+      "name": "Respond - Get User Repos"
+    }
+  ],
+  "connections": {
+    "Webhook - Get User Repos": {
+      "main": [
+        [
+          {
+            "node": "Fetch GitHub Repos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch GitHub Repos": {
+      "main": [
+        [
+          {
+            "node": "Format Repos for Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Repos for Backend": {
+      "main": [
+        [
+          {
+            "node": "Respond - Get User Repos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
