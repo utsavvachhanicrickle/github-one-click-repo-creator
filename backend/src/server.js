@@ -53,8 +53,15 @@ app.use('/api', apiRoutes);
 
 app.use(errorHandler);
 
-connectDB().then(() => {
+// Connect to DB and start server (local dev only)
+// On Vercel, the app is exported and Vercel handles the HTTP layer
+connectDB();
+
+// For local development
+if (process.env.NODE_ENV !== 'production') {
   app.listen(config.port, () => {
     console.log(`Backend running on http://localhost:${config.port}`);
   });
-});
+}
+
+export default app;
