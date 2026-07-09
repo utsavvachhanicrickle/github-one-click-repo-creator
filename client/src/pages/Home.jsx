@@ -65,7 +65,7 @@ export default function Home() {
       {/* Features Grid */}
       <section className="max-w-6xl mx-auto px-6 mt-28 relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="p-8 rounded-3xl bg-(--bg-primary) border border-(--border) shadow-xs hover:border-(--primary) hover:shadow-md transition duration-300 ease-in-out group relative overflow-hidden select-none">
-          <div className="absolute inset-0 bg-gradient-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.02] transition-opacity duration-300 pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.02] transition-opacity duration-300 pointer-events-none" />
           <div className="w-12 h-12 rounded-2xl bg-(--bg-secondary) border border-(--border) text-(--primary) flex items-center justify-center mb-6 group-hover:bg-(--primary) group-hover:text-(--text-inverse) transition-all duration-300">
             <FolderGit2 size={22} />
           </div>
@@ -76,7 +76,7 @@ export default function Home() {
         </div>
 
         <div className="p-8 rounded-3xl bg-(--bg-primary) border border-(--border) shadow-xs hover:border-(--primary) hover:shadow-md transition duration-300 ease-in-out group relative overflow-hidden select-none">
-          <div className="absolute inset-0 bg-gradient-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.02] transition-opacity duration-300 pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.02] transition-opacity duration-300 pointer-events-none" />
           <div className="w-12 h-12 rounded-2xl bg-(--bg-secondary) border border-(--border) text-(--primary) flex items-center justify-center mb-6 group-hover:bg-(--primary) group-hover:text-(--text-inverse) transition-all duration-300">
             <RefreshCw size={22} />
           </div>
@@ -87,7 +87,7 @@ export default function Home() {
         </div>
 
         <div className="p-8 rounded-3xl bg-(--bg-primary) border border-(--border) shadow-xs hover:border-(--primary) hover:shadow-md transition duration-300 ease-in-out group relative overflow-hidden select-none">
-          <div className="absolute inset-0 bg-gradient-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.02] transition-opacity duration-300 pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.02] transition-opacity duration-300 pointer-events-none" />
           <div className="w-12 h-12 rounded-2xl bg-(--bg-secondary) border border-(--border) text-(--primary) flex items-center justify-center mb-6 group-hover:bg-(--primary) group-hover:text-(--text-inverse) transition-all duration-300">
             <ShieldCheck size={22} />
           </div>

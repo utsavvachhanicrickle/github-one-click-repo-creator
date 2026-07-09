@@ -36,6 +36,9 @@ export default function RepoDetail() {
   const [successResult, setSuccessResult] = useState(null);
   const [error, setError] = useState('');
 
+  // Active workspace tab state ('upload' | 'flutter-rename')
+  const [activeTab, setActiveTab] = useState('upload');
+
   // Flutter App Rename State
   const [flutterAppName, setFlutterAppName] = useState('');
   const [selectedPaths, setSelectedPaths] = useState(new Set());
@@ -391,78 +394,133 @@ export default function RepoDetail() {
                 </div>
               )}
 
-              <FolderUpload onFolderSelect={handleFolderSelect} />
-
-              {/* Flutter App Rename Input */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-(--text-primary) select-none">
-                  Flutter App Rename (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={flutterAppName}
-                  onChange={(e) => {
-                    setFlutterAppName(e.target.value);
-                    setComparisonResult(null);
-                  }}
-                  placeholder="e.g. utsav_vachhani"
-                  disabled={committing || comparing}
-                  className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3.5 text-xs text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
-                />
-                 <p className="text-[10px] text-(--text-secondary) select-none leading-relaxed">
-                  If uploaded files contain a Flutter application, this automatically renames the app inside <code className="font-bold text-(--text-primary)">AppInfo.xcconfig</code> and <code className="font-bold text-(--text-primary)">AndroidManifest.xml</code>.
-                </p>
-                
+              {/* Workspace Tabs */}
+              <div className="flex border-b border-(--border) select-none pt-2">
                 <button
-                  onClick={handleRemoteRename}
-                  disabled={comparing || committing || renamingRemote || !flutterAppName.trim() || branchesLoading}
-                  className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) font-extrabold py-3 rounded-xl flex items-center justify-center gap-2 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-xs"
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('upload');
+                    setError('');
+                  }}
+                  className={`flex-1 pb-3 text-xs font-black border-b-2 transition duration-200 cursor-pointer ${
+                    activeTab === 'upload'
+                      ? 'border-(--primary) text-(--primary)'
+                      : 'border-transparent text-(--text-secondary) hover:text-(--text-primary)'
+                  }`}
                 >
-                  {renamingRemote ? (
-                    <>
-                      <Loader2 className="animate-spin" size={14} />
-                      Renaming Remote App...
-                    </>
-                  ) : (
-                    'Rename Remote Flutter App Only'
-                  )}
+                  Upload Project Folder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('flutter-rename');
+                    setError('');
+                  }}
+                  className={`flex-1 pb-3 text-xs font-black border-b-2 transition duration-200 cursor-pointer ${
+                    activeTab === 'flutter-rename'
+                      ? 'border-(--primary) text-(--primary)'
+                      : 'border-transparent text-(--text-secondary) hover:text-(--text-primary)'
+                  }`}
+                >
+                  Rename Flutter App (Remote)
                 </button>
               </div>
 
-              <div className="flex items-center gap-3 select-none">
-                <input
-                  type="checkbox"
-                  id="includeDeletions"
-                  checked={includeDeletions}
-                  onChange={(e) => {
-                    setIncludeDeletions(e.target.checked);
-                    setComparisonResult(null);
-                  }}
-                  disabled={committing || comparing}
-                  className="w-4.5 h-4.5 rounded border-(--border) bg-(--bg-secondary) text-(--primary) focus:ring-(--primary) cursor-pointer disabled:opacity-50"
-                />
-                <label
-                  htmlFor="includeDeletions"
-                  className="text-xs font-bold text-(--text-primary) cursor-pointer select-none disabled:opacity-50"
-                >
-                  Enable Safe Delete (Remove missing local files on remote branch)
-                </label>
-              </div>
+              {activeTab === 'upload' ? (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  <FolderUpload onFolderSelect={handleFolderSelect} />
 
-              <button
-                onClick={handleCompare}
-                disabled={files.length === 0 || comparing || committing || branchesLoading}
-                className="w-full bg-(--primary) hover:bg-(--primary-hover) text-(--text-inverse) font-extrabold py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
-              >
-                {comparing ? (
-                  <>
-                    <Loader2 className="animate-spin" size={18} />
-                    Comparing Changes...
-                  </>
-                ) : (
-                  'Compare Changes'
-                )}
-              </button>
+                  {/* Flutter App Rename Input */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-(--text-primary) select-none">
+                      Flutter App Rename (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={flutterAppName}
+                      onChange={(e) => {
+                        setFlutterAppName(e.target.value);
+                        setComparisonResult(null);
+                      }}
+                      placeholder="e.g. utsav_vachhani"
+                      disabled={committing || comparing}
+                      className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3.5 text-xs text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
+                    />
+                    <p className="text-[10px] text-(--text-secondary) select-none leading-relaxed">
+                      If uploaded files contain a Flutter application, this automatically renames the app inside <code className="font-bold text-(--text-primary)">AppInfo.xcconfig</code> and <code className="font-bold text-(--text-primary)">AndroidManifest.xml</code> on commit.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 select-none">
+                    <input
+                      type="checkbox"
+                      id="includeDeletions"
+                      checked={includeDeletions}
+                      onChange={(e) => {
+                        setIncludeDeletions(e.target.checked);
+                        setComparisonResult(null);
+                      }}
+                      disabled={committing || comparing}
+                      className="w-4.5 h-4.5 rounded border-(--border) bg-(--bg-secondary) text-(--primary) focus:ring-(--primary) cursor-pointer disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor="includeDeletions"
+                      className="text-xs font-bold text-(--text-primary) cursor-pointer select-none disabled:opacity-50"
+                    >
+                      Enable Safe Delete (Remove missing local files on remote branch)
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={handleCompare}
+                    disabled={files.length === 0 || comparing || committing || branchesLoading}
+                    className="w-full bg-(--primary) hover:bg-(--primary-hover) text-(--text-inverse) font-extrabold py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
+                  >
+                    {comparing ? (
+                      <>
+                        <Loader2 className="animate-spin" size={18} />
+                        Comparing Changes...
+                      </>
+                    ) : (
+                      'Compare Changes'
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-(--text-primary) select-none">
+                      New Flutter Application Name
+                    </label>
+                    <input
+                      type="text"
+                      value={flutterAppName}
+                      onChange={(e) => setFlutterAppName(e.target.value)}
+                      placeholder="e.g. utsav_vachhani"
+                      disabled={renamingRemote}
+                      className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3.5 text-xs text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
+                    />
+                    <p className="text-[10px] text-(--text-secondary) select-none leading-relaxed">
+                      Directly renames the application inside <code className="font-bold text-(--text-primary)">AppInfo.xcconfig</code> and <code className="font-bold text-(--text-primary)">AndroidManifest.xml</code> on the remote branch <code className="font-bold text-(--text-primary)">{selectedBranch}</code> without uploading any local files.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleRemoteRename}
+                    disabled={renamingRemote || !flutterAppName.trim() || branchesLoading}
+                    className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) font-extrabold py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm animate-pulse-slow"
+                  >
+                    {renamingRemote ? (
+                      <>
+                        <Loader2 className="animate-spin" size={18} />
+                        Renaming Remote Flutter App...
+                      </>
+                    ) : (
+                      'Rename Remote Flutter App Only'
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
