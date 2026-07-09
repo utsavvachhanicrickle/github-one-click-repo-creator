@@ -25,6 +25,11 @@ app.use(
   })
 );
 
+// Health check BEFORE session middleware (no DB needed)
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.use(
   session({
     name: 'repo_creator_sid',
@@ -34,7 +39,9 @@ app.use(
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/github-repo-creator',
       collectionName: 'sessions',
-      touchAfter: 3600
+      touchAfter: 3600,
+      autoRemove: 'interval',
+      autoRemoveInterval: 10
     }),
     cookie: {
       httpOnly: true,
@@ -45,17 +52,12 @@ app.use(
   })
 );
 
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true });
-});
-
 app.use('/api', apiRoutes);
 
 app.use(errorHandler);
 
-// Connect to DB and start server (local dev only)
-// On Vercel, the app is exported and Vercel handles the HTTP layer
-connectDB();
+// Connect to DB at module load time (works for both local and Vercel serverless)
+await connectDB();
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
