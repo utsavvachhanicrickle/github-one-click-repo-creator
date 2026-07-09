@@ -174,7 +174,7 @@ export default function RepoDetail() {
 
         {/* Repository Header Card */}
         <div className="bg-(--bg-primary) border border-(--border) rounded-3xl p-8 mb-8 shadow-xs relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-tr from-(--primary) to-(--accent) opacity-[0.02] pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-[0.02] pointer-events-none" />
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
             <div>
               <h2 className="text-3xl font-black text-(--text-primary) tracking-tight mb-2">
