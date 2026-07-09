@@ -54,7 +54,11 @@ app.use('/api', apiRoutes);
 app.use(errorHandler);
 
 connectDB().then(() => {
-  app.listen(config.port, () => {
-    console.log(`Backend running on http://localhost:${config.port}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(config.port, () => {
+      console.log(`Backend running on http://localhost:${config.port}`);
+    });
+  }
 });
+
+export default app;

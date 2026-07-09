@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import RepoDetail from './pages/RepoDetail.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import PublicRoute from './components/PublicRoute.jsx';
 import Toast from './components/Toast.jsx';
@@ -45,6 +46,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/repos/:owner/:repo"
+          element={
+            <ProtectedRoute>
+              <RepoDetail />
             </ProtectedRoute>
           }
         />

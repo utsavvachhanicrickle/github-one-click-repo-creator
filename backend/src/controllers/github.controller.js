@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Octokit } from '@octokit/rest';
+import crypto from 'crypto';
 import { createStarterWebsiteFiles } from '../services/starterTemplate.service.js';
 import { getRepositoriesFromN8n } from '../services/n8n.service.js';
 import { createRepoWithFiles } from '../services/githubRepo.service.js';
@@ -108,6 +109,519 @@ export async function getUserRepositories(req, res, next) {
     return res.status(503).json({
       message: 'Failed to fetch repositories: the n8n integration is offline or unconfigured.'
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Helper to determine if a relative path is ignored or dangerous
+function isIgnoredOrDangerousPath(relativePath) {
+  if (!relativePath) return true;
+
+  const cleanPath = relativePath.replace(/\\/g, '/');
+
+  if (
+    cleanPath.includes('../') ||
+    cleanPath.startsWith('/') ||
+    cleanPath.trim() === ''
+  ) {
+    return true;
+  }
+
+  const segments = cleanPath.split('/');
+  const ignoredNames = new Set([
+    'node_modules',
+    '.git',
+    'dist',
+    'build',
+    'coverage',
+    '.env',
+    '.env.local',
+    '.env.production',
+    '.DS_Store'
+  ]);
+
+  for (const segment of segments) {
+    if (ignoredNames.has(segment)) {
+      return true;
+    }
+    // Ignore hidden files except normal config files like .gitignore
+    if (segment.startsWith('.') && segment !== '.gitignore') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Helper to calculate Git blob SHA
+function calculateGitSha(buffer) {
+  const header = `blob ${buffer.length}\0`;
+  const hash = crypto.createHash('sha1');
+  hash.update(header);
+  hash.update(buffer);
+  return hash.digest('hex');
+}
+
+// 1. Get all accessible user repositories
+export async function getUserRepos(req, res, next) {
+  try {
+    const octokit = new Octokit({ auth: req.session.githubAccessToken });
+    const { data: repos } = await octokit.repos.listForAuthenticatedUser({
+      sort: 'updated',
+      per_page: 100
+    });
+
+    const formattedRepos = repos.map((r) => ({
+      name: r.name,
+      owner: r.owner.login,
+      isPrivate: r.private,
+      defaultBranch: r.default_branch,
+      updatedAt: r.updated_at,
+      language: r.language,
+      htmlUrl: r.html_url
+    }));
+
+    res.json(formattedRepos);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// 2. Get repository branches
+export async function getRepoBranches(req, res, next) {
+  try {
+    const { owner, repo } = req.params;
+    const octokit = new Octokit({ auth: req.session.githubAccessToken });
+    try {
+      const { data: branches } = await octokit.repos.listBranches({
+        owner,
+        repo,
+        per_page: 100
+      });
+      res.json(branches.map((b) => b.name));
+    } catch (err) {
+      if (err.status === 409 && err.message?.includes('Git Repository is empty')) {
+        return res.json([]);
+      }
+      throw err;
+    }
+  } catch (err) {
+    next(err);
+  }
+}
+
+// 2b. Create a new branch from a source branch
+export async function createBranch(req, res, next) {
+  try {
+    const { owner, repo } = req.params;
+    const { branchName, sourceBranch } = req.body;
+
+    if (!branchName) {
+      return res.status(400).json({ message: 'Branch name is required' });
+    }
+    if (!sourceBranch) {
+      return res.status(400).json({ message: 'Source branch is required' });
+    }
+
+    const octokit = new Octokit({ auth: req.session.githubAccessToken });
+
+    let sourceSha;
+    try {
+      const refRes = await octokit.git.getRef({
+        owner,
+        repo,
+        ref: `heads/${sourceBranch}`
+      });
+      sourceSha = refRes.data.object.sha;
+    } catch (err) {
+      if (err.status === 409 && err.message?.includes('Git Repository is empty')) {
+        return res.status(409).json({
+          message: 'Cannot create a new branch: the repository is empty. Please push/commit files to initialize the repository first.'
+        });
+      }
+      throw err;
+    }
+
+    const cleanBranchName = branchName.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._/-]/g, '');
+    await octokit.git.createRef({
+      owner,
+      repo,
+      ref: `refs/heads/${cleanBranchName}`,
+      sha: sourceSha
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Branch "${cleanBranchName}" created successfully from "${sourceBranch}".`,
+      branchName: cleanBranchName
+    });
+  } catch (err) {
+    if (err.status === 422) {
+      return res.status(422).json({
+        message: 'A branch with this name may already exist in GitHub.'
+      });
+    }
+    next(err);
+  }
+}
+
+// 3. Compare uploaded folder with selected GitHub branch tree
+export async function compareUpload(req, res, next) {
+  try {
+    const { owner, repo } = req.params;
+    const { branch, includeDeletions = 'false' } = req.body;
+
+    if (!branch) {
+      return res.status(400).json({ message: 'Branch is required' });
+    }
+
+    const octokit = new Octokit({ auth: req.session.githubAccessToken });
+    const uploadedFiles = req.files || [];
+
+    let relativePaths = [];
+    if (req.body.paths) {
+      try {
+        relativePaths = JSON.parse(req.body.paths);
+      } catch (e) {
+        console.warn('Failed to parse paths JSON', e);
+      }
+    }
+
+    const maxFiles = 500;
+    if (uploadedFiles.length > maxFiles) {
+      return res.status(400).json({ message: `Max upload limit exceeded (Max: ${maxFiles} files)` });
+    }
+
+    const validUploadedFiles = [];
+    let ignoredCount = 0;
+
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const relPath = relativePaths[i] || file.originalname || file.name;
+
+      if (isIgnoredOrDangerousPath(relPath)) {
+        ignoredCount++;
+        continue;
+      }
+
+      validUploadedFiles.push({
+        file,
+        path: relPath.replace(/\\/g, '/'),
+        sha: calculateGitSha(file.buffer)
+      });
+    }
+
+    const remoteFilesMap = new Map();
+    const remotePaths = new Set();
+    let latestCommitSha = null;
+
+    try {
+      const refRes = await octokit.git.getRef({
+        owner,
+        repo,
+        ref: `heads/${branch}`
+      });
+      latestCommitSha = refRes.data.object.sha;
+
+      const commitRes = await octokit.git.getCommit({
+        owner,
+        repo,
+        commit_sha: latestCommitSha
+      });
+      const treeSha = commitRes.data.tree.sha;
+
+      const treeRes = await octokit.git.getTree({
+        owner,
+        repo,
+        tree_sha: treeSha,
+        recursive: '1'
+      });
+
+      for (const node of treeRes.data.tree) {
+        if (node.type === 'blob') {
+          remoteFilesMap.set(node.path, node.sha);
+          remotePaths.add(node.path);
+        }
+      }
+    } catch (err) {
+      // If branch does not exist or repository is empty, treat remote tree as empty (all uploads are added)
+      if (err.status !== 404 && err.status !== 409) {
+        throw err;
+      }
+    }
+
+    const added = [];
+    const modified = [];
+    const unchanged = [];
+    const localPaths = new Set();
+
+    for (const item of validUploadedFiles) {
+      localPaths.add(item.path);
+
+      if (!remoteFilesMap.has(item.path)) {
+        added.push(item.path);
+      } else {
+        const remoteSha = remoteFilesMap.get(item.path);
+        if (remoteSha !== item.sha) {
+          modified.push(item.path);
+        } else {
+          unchanged.push(item.path);
+        }
+      }
+    }
+
+    const deleted = [];
+    for (const remotePath of remotePaths) {
+      if (!localPaths.has(remotePath)) {
+        if (isIgnoredOrDangerousPath(remotePath)) {
+          continue;
+        }
+        deleted.push(remotePath);
+      }
+    }
+
+    res.json({
+      success: true,
+      summary: {
+        added,
+        modified,
+        deleted: includeDeletions === 'true' ? deleted : [],
+        unchangedCount: unchanged.length,
+        ignoredCount
+      }
+    });
+
+  } catch (err) {
+    next(err);
+  }
+}
+
+// 4. Atomic Commit & Push to branch using GitHub Git Database API
+export async function commitUpload(req, res, next) {
+  try {
+    const { owner, repo } = req.params;
+    const { branch, commitMessage = 'Upload project files from dashboard', includeDeletions = 'false' } = req.body;
+
+    if (!branch) {
+      return res.status(400).json({ message: 'Branch is required' });
+    }
+
+    const octokit = new Octokit({ auth: req.session.githubAccessToken });
+    const uploadedFiles = req.files || [];
+
+    let relativePaths = [];
+    if (req.body.paths) {
+      try {
+        relativePaths = JSON.parse(req.body.paths);
+      } catch (e) {
+        console.warn('Failed to parse paths JSON', e);
+      }
+    }
+
+    const maxFiles = 500;
+    if (uploadedFiles.length > maxFiles) {
+      return res.status(400).json({ message: `Max upload limit exceeded (Max: ${maxFiles} files)` });
+    }
+
+    const validUploadedFiles = [];
+    let ignoredCount = 0;
+
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const relPath = relativePaths[i] || file.originalname || file.name;
+
+      if (isIgnoredOrDangerousPath(relPath)) {
+        ignoredCount++;
+        continue;
+      }
+
+      validUploadedFiles.push({
+        file,
+        path: relPath.replace(/\\/g, '/'),
+        sha: calculateGitSha(file.buffer)
+      });
+    }
+
+    let latestCommitSha = null;
+    let isInitialCommit = false;
+
+    try {
+      const refRes = await octokit.git.getRef({
+        owner,
+        repo,
+        ref: `heads/${branch}`
+      });
+      latestCommitSha = refRes.data.object.sha;
+    } catch (err) {
+      if (err.status === 404 || err.status === 409) {
+        isInitialCommit = true;
+      } else {
+        throw err;
+      }
+    }
+
+    let remoteBlobs = [];
+    if (!isInitialCommit) {
+      const commitRes = await octokit.git.getCommit({
+        owner,
+        repo,
+        commit_sha: latestCommitSha
+      });
+      const latestTreeSha = commitRes.data.tree.sha;
+
+      const treeRes = await octokit.git.getTree({
+        owner,
+        repo,
+        tree_sha: latestTreeSha,
+        recursive: '1'
+      });
+
+      remoteBlobs = treeRes.data.tree.filter((node) => node.type === 'blob');
+    }
+
+    const remoteFilesMap = new Map(remoteBlobs.map((node) => [node.path, node]));
+
+    const addedPaths = [];
+    const modifiedPaths = [];
+    const unchangedPaths = [];
+    const localPaths = new Set();
+    const filesToUpload = [];
+
+    for (const item of validUploadedFiles) {
+      localPaths.add(item.path);
+
+      if (!remoteFilesMap.has(item.path)) {
+        addedPaths.push(item.path);
+        filesToUpload.push(item);
+      } else {
+        const remoteNode = remoteFilesMap.get(item.path);
+        if (remoteNode.sha !== item.sha) {
+          modifiedPaths.push(item.path);
+          filesToUpload.push(item);
+        } else {
+          unchangedPaths.push(item.path);
+        }
+      }
+    }
+
+    const deletedPaths = [];
+    for (const remoteBlob of remoteBlobs) {
+      if (!localPaths.has(remoteBlob.path)) {
+        if (!isIgnoredOrDangerousPath(remoteBlob.path)) {
+          deletedPaths.push(remoteBlob.path);
+        }
+      }
+    }
+
+    const actuallyDeleting = includeDeletions === 'true';
+    if (filesToUpload.length === 0 && (!actuallyDeleting || deletedPaths.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'No changes detected. Uploaded files are identical to the remote branch files.'
+      });
+    }
+
+    // Create blobs for changed files
+    const blobPromises = filesToUpload.map(async (item) => {
+      const blobRes = await octokit.git.createBlob({
+        owner,
+        repo,
+        content: item.file.buffer.toString('base64'),
+        encoding: 'base64'
+      });
+      return {
+        path: item.path,
+        sha: blobRes.data.sha
+      };
+    });
+
+    const newBlobs = await Promise.all(blobPromises);
+    const newBlobsMap = new Map(newBlobs.map((b) => [b.path, b.sha]));
+
+    const finalTreeNodes = [];
+
+    // Keep unchanged remote blobs
+    for (const remoteBlob of remoteBlobs) {
+      const path = remoteBlob.path;
+
+      if (actuallyDeleting && deletedPaths.includes(path)) {
+        continue;
+      }
+
+      if (newBlobsMap.has(path)) {
+        continue;
+      }
+
+      finalTreeNodes.push({
+        path: remoteBlob.path,
+        mode: remoteBlob.mode,
+        type: remoteBlob.type,
+        sha: remoteBlob.sha
+      });
+    }
+
+    // Add updated or new blobs
+    for (const blob of newBlobs) {
+      finalTreeNodes.push({
+        path: blob.path,
+        mode: '100644',
+        type: 'blob',
+        sha: blob.sha
+      });
+    }
+
+    const newTreeRes = await octokit.git.createTree({
+      owner,
+      repo,
+      tree: finalTreeNodes
+    });
+    const newTreeSha = newTreeRes.data.sha;
+
+    const commitParams = {
+      owner,
+      repo,
+      message: commitMessage,
+      tree: newTreeSha
+    };
+    if (!isInitialCommit) {
+      commitParams.parents = [latestCommitSha];
+    }
+
+    const newCommitRes = await octokit.git.createCommit(commitParams);
+    const newCommitSha = newCommitRes.data.sha;
+
+    if (isInitialCommit) {
+      await octokit.git.createRef({
+        owner,
+        repo,
+        ref: `refs/heads/${branch}`,
+        sha: newCommitSha
+      });
+    } else {
+      await octokit.git.updateRef({
+        owner,
+        repo,
+        ref: `heads/${branch}`,
+        sha: newCommitSha
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Changes pushed successfully',
+      commitSha: newCommitSha,
+      commitUrl: `https://github.com/${owner}/${repo}/commit/${newCommitSha}`,
+      branchUrl: `https://github.com/${owner}/${repo}/tree/${branch}`,
+      summary: {
+        added: addedPaths.length,
+        modified: modifiedPaths.length,
+        deleted: actuallyDeleting ? deletedPaths.length : 0,
+        unchanged: unchangedPaths.length,
+        ignored: ignoredCount
+      }
+    });
+
   } catch (err) {
     next(err);
   }
