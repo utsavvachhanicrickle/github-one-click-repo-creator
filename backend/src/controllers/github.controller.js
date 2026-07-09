@@ -61,27 +61,6 @@ export async function createWebsiteRepo(req, res, next) {
   }
 }
 
-export async function getUserRepositories(req, res, next) {
-  try {
-    const n8nRepos = await getRepositoriesFromN8n(
-      req.session.githubAccessToken,
-      req.session.githubUser?.login
-    );
-
-    if (n8nRepos !== null) {
-      console.log(`[n8n] Successfully fetched user repositories via n8n webhook for: ${req.session.githubUser?.login}`);
-      return res.json(n8nRepos);
-    }
-
-    console.error(`[n8n] Error: Webhook is offline or failed, and direct GitHub fallback is disabled.`);
-    return res.status(503).json({
-      message: 'Failed to fetch repositories: the n8n integration is offline or unconfigured.'
-    });
-  } catch (err) {
-    next(err);
-  }
-}
-
 // Helper to determine if a relative path is ignored or dangerous
 function isIgnoredOrDangerousPath(relativePath) {
   if (!relativePath) return true;
@@ -169,23 +148,20 @@ function processFlutterRenames(validUploadedFiles, flutterAppName) {
 // 1. Get all accessible user repositories
 export async function getUserRepos(req, res, next) {
   try {
-    const octokit = new Octokit({ auth: req.session.githubAccessToken });
-    const { data: repos } = await octokit.repos.listForAuthenticatedUser({
-      sort: 'updated',
-      per_page: 100
+    const n8nRepos = await getRepositoriesFromN8n(
+      req.session.githubAccessToken,
+      req.session.githubUser?.login
+    );
+
+    if (n8nRepos !== null) {
+      console.log(`[n8n] Successfully fetched user repositories via n8n webhook for /repos: ${req.session.githubUser?.login}`);
+      return res.json(n8nRepos);
+    }
+
+    console.error(`[n8n] Error: Webhook is offline or failed, and direct GitHub fallback is disabled.`);
+    return res.status(503).json({
+      message: 'Failed to fetch repositories: the n8n integration is offline or unconfigured.'
     });
-
-    const formattedRepos = repos.map((r) => ({
-      name: r.name,
-      owner: r.owner.login,
-      isPrivate: r.private,
-      defaultBranch: r.default_branch,
-      updatedAt: r.updated_at,
-      language: r.language,
-      htmlUrl: r.html_url
-    }));
-
-    res.json(formattedRepos);
   } catch (err) {
     next(err);
   }

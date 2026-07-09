@@ -19,10 +19,12 @@ export async function getRepositoriesFromN8n(accessToken, username) {
 
     return repos.map((r) => ({
       name: r.name,
-      htmlUrl: r.htmlUrl || r.html_url,
-      isPrivate: r.isPrivate !== undefined ? r.isPrivate : r.private,
-      description: r.description,
-      updatedAt: r.updatedAt || r.updated_at
+      owner: r.owner?.login || r.owner || username,
+      isPrivate: r.private !== undefined ? r.private : (r.isPrivate !== undefined ? r.isPrivate : r.private),
+      defaultBranch: r.default_branch || r.defaultBranch || 'main',
+      updatedAt: r.updated_at || r.updatedAt,
+      language: r.language || null,
+      htmlUrl: r.html_url || r.htmlUrl
     }));
   } catch (error) {
     console.warn('[n8n] Get Repositories webhook failed:', error.message);
