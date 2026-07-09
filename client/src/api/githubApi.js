@@ -63,3 +63,19 @@ export async function createRepoBranch(owner, repo, branchName, sourceBranch) {
   }
   return data;
 }
+
+export async function renameRemoteFlutterApp(owner, repo, branch, flutterAppName) {
+  const res = await fetch(`${API_BASE_URL}/api/github/repos/${owner}/${repo}/rename-remote-flutter`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ branch, flutterAppName })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Failed to rename remote Flutter app');
+  }
+  return data;
+}

@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar.jsx';
 import BranchSelector from '../components/BranchSelector.jsx';
 import FolderUpload from '../components/FolderUpload.jsx';
 import ChangesPreview from '../components/ChangesPreview.jsx';
-import { getRepoBranches, compareFolderUpload, commitFolderUpload, createRepoBranch } from '../api/githubApi.js';
+import { getRepoBranches, compareFolderUpload, commitFolderUpload, createRepoBranch, renameRemoteFlutterApp } from '../api/githubApi.js';
 
 function getCleanRelativePath(file) {
   const cleanPath = (file.webkitRelativePath || file.name).replace(/\\/g, '/');
@@ -38,6 +38,19 @@ export default function RepoDetail() {
 
   // Flutter App Rename State
   const [flutterAppName, setFlutterAppName] = useState('');
+  const [selectedPaths, setSelectedPaths] = useState(new Set());
+
+  const handleTogglePath = (path) => {
+    setSelectedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  };
 
   // Create Branch States
   const [showNewBranchInput, setShowNewBranchInput] = useState(false);
@@ -69,6 +82,29 @@ export default function RepoDetail() {
       setError(err.message || 'Failed to create new branch.');
     } finally {
       setCreatingBranch(false);
+    }
+  };
+
+  const [renamingRemote, setRenamingRemote] = useState(false);
+
+  const handleRemoteRename = async () => {
+    if (!flutterAppName.trim()) {
+      setError('Please enter a new Flutter application name first.');
+      return;
+    }
+    try {
+      setRenamingRemote(true);
+      setError('');
+      setSuccessResult(null);
+      setComparisonResult(null);
+
+      const result = await renameRemoteFlutterApp(owner, repo, selectedBranch, flutterAppName.trim());
+      setSuccessResult(result);
+      setFlutterAppName('');
+    } catch (err) {
+      setError(err.message || 'Failed to rename remote Flutter application.');
+    } finally {
+      setRenamingRemote(false);
     }
   };
 
@@ -127,6 +163,19 @@ export default function RepoDetail() {
 
       const result = await compareFolderUpload(owner, repo, formData);
       setComparisonResult(result.summary);
+
+      // Select all files by default
+      const allPaths = new Set([
+        ...result.summary.added,
+        ...result.summary.modified,
+        ...result.summary.deleted
+      ]);
+      setSelectedPaths(allPaths);
+
+      // Auto-prefill unique commit message suggestion
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setCommitMessage(`Sync upload - ${timeStr}`);
     } catch (err) {
       setError(err.message || 'Failed to compare local folder with GitHub branch.');
     } finally {
@@ -147,16 +196,21 @@ export default function RepoDetail() {
 
       const relativePaths = [];
       files.forEach((file) => {
-        formData.append('files', file);
-        relativePaths.push(getCleanRelativePath(file));
+        const cleanPath = getCleanRelativePath(file);
+        if (selectedPaths.has(cleanPath)) {
+          formData.append('files', file);
+          relativePaths.push(cleanPath);
+        }
       });
       formData.append('paths', JSON.stringify(relativePaths));
+      formData.append('selectedPaths', JSON.stringify(Array.from(selectedPaths)));
 
       const result = await commitFolderUpload(owner, repo, formData);
       setSuccessResult(result);
       setFiles([]);
       setFileStats(null);
       setComparisonResult(null);
+      setSelectedPaths(new Set());
       setCommitMessage('');
     } catch (err) {
       setError(err.message || 'Failed to commit and push changes.');
@@ -172,7 +226,7 @@ export default function RepoDetail() {
       <div className="max-w-5xl mx-auto px-6 mt-8">
         <Link
           to="/dashboard"
-          className="inline-flex items-center gap-2 text-xs font-bold text-(--text-secondary) hover:text-(--primary) transition mb-6 select-none"
+          className="inline-flex items-center gap-2 text-xs font-bold text-(--text-secondary) hover:text-(--primary) transition duration-200 ease-in-out mb-6 select-none"
         >
           <ArrowLeft size={16} /> Back to Dashboard
         </Link>
@@ -193,7 +247,7 @@ export default function RepoDetail() {
               href={`https://github.com/${owner}/${repo}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center justify-center gap-2 bg-(--bg-secondary) hover:bg-(--bg-active) border border-(--border) text-(--text-primary) font-bold px-5 py-3 rounded-2xl transition text-sm select-none"
+              className="inline-flex items-center justify-center gap-2 bg-(--bg-secondary) hover:bg-(--bg-active) border border-(--border) text-(--text-primary) font-bold px-5 py-3 rounded-2xl transition duration-200 ease-in-out text-sm select-none"
             >
               <Github size={18} />
               Open on GitHub
@@ -251,7 +305,7 @@ export default function RepoDetail() {
                   href={successResult.commitUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 bg-(--primary) text-(--text-inverse) hover:bg-(--primary-hover) font-bold py-3.5 rounded-xl transition text-xs shadow-xs"
+                  className="flex-1 inline-flex items-center justify-center gap-2 bg-(--primary) text-(--text-inverse) hover:bg-(--primary-hover) font-bold py-3.5 rounded-xl transition duration-200 ease-in-out text-xs shadow-xs"
                 >
                   View Commit <ExternalLink size={14} />
                 </a>
@@ -259,7 +313,7 @@ export default function RepoDetail() {
                   href={successResult.branchUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 bg-(--bg-secondary) hover:bg-zinc-200 text-(--text-primary) font-bold py-3.5 rounded-xl border border-(--border) transition text-xs"
+                  className="flex-1 inline-flex items-center justify-center gap-2 bg-(--bg-secondary) hover:bg-(--bg-active) text-(--text-primary) font-bold py-3.5 rounded-xl border border-(--border) transition duration-200 ease-in-out text-xs"
                 >
                   Browse Branch <ExternalLink size={14} />
                 </a>
@@ -355,9 +409,24 @@ export default function RepoDetail() {
                   disabled={committing || comparing}
                   className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3.5 text-xs text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
                 />
-                <p className="text-[10px] text-(--text-secondary) select-none leading-relaxed">
+                 <p className="text-[10px] text-(--text-secondary) select-none leading-relaxed">
                   If uploaded files contain a Flutter application, this automatically renames the app inside <code className="font-bold text-(--text-primary)">AppInfo.xcconfig</code> and <code className="font-bold text-(--text-primary)">AndroidManifest.xml</code>.
                 </p>
+                
+                <button
+                  onClick={handleRemoteRename}
+                  disabled={comparing || committing || renamingRemote || !flutterAppName.trim() || branchesLoading}
+                  className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) font-extrabold py-3 rounded-xl flex items-center justify-center gap-2 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-xs"
+                >
+                  {renamingRemote ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} />
+                      Renaming Remote App...
+                    </>
+                  ) : (
+                    'Rename Remote Flutter App Only'
+                  )}
+                </button>
               </div>
 
               <div className="flex items-center gap-3 select-none">
@@ -383,7 +452,7 @@ export default function RepoDetail() {
               <button
                 onClick={handleCompare}
                 disabled={files.length === 0 || comparing || committing || branchesLoading}
-                className="w-full bg-(--primary) hover:bg-(--primary-hover) text-(--text-inverse) font-extrabold py-4 rounded-xl flex items-center justify-center gap-2.5 transition active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
+                className="w-full bg-(--primary) hover:bg-(--primary-hover) text-(--text-inverse) font-extrabold py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
               >
                 {comparing ? (
                   <>
@@ -401,7 +470,11 @@ export default function RepoDetail() {
           <div className="md:col-span-6">
             {comparisonResult ? (
               <div className="bg-(--bg-primary) border border-(--border) rounded-3xl p-6 shadow-xs space-y-6">
-                <ChangesPreview summary={comparisonResult} />
+                <ChangesPreview
+                  summary={comparisonResult}
+                  selectedPaths={selectedPaths}
+                  onTogglePath={handleTogglePath}
+                />
 
                 {(comparisonResult.added.length > 0 ||
                   comparisonResult.modified.length > 0 ||
@@ -424,7 +497,7 @@ export default function RepoDetail() {
                     <button
                       onClick={handleCommit}
                       disabled={committing}
-                      className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) font-black py-4 rounded-xl flex items-center justify-center gap-2.5 transition active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
+                      className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) font-black py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
                     >
                       {committing ? (
                         <>
@@ -437,8 +510,9 @@ export default function RepoDetail() {
                     </button>
                   </div>
                 ) : (
-                  <div className="p-4 rounded-2xl bg-(--bg-secondary)/30 border border-(--border) text-center select-none text-xs text-(--text-secondary)">
-                    No modifications to commit. Local folder is fully up-to-date with branch.
+                  <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center select-none text-xs text-(--text-primary) leading-relaxed">
+                    <span className="font-extrabold text-amber-600 block mb-1">No Changes Detected</span>
+                    Local folder matches the remote branch exactly. To force a commit, add a unique file (e.g. <code className="font-bold underline text-amber-700 font-mono text-[10px]">unique-sync.txt</code>) or modify any file in your folder.
                   </div>
                 )}
               </div>

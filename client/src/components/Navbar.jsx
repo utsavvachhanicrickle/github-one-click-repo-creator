@@ -1,10 +1,11 @@
 import { useContext } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Sun, Moon, LogOut } from 'lucide-react';
+import { Sun, Moon, LogOut, Github } from 'lucide-react';
 import { logoutUser } from '../store/slices/authSlice.js';
 import { clearRepoState } from '../store/slices/repoSlice.js';
 import { DarkModeContext } from '../context/darkModeContext.jsx';
 import Logo from './Logo.jsx';
+import { loginWithGitHub } from '../services/api.js';
 
 export default function Navbar() {
   const dispatch = useDispatch();
@@ -30,7 +31,7 @@ export default function Navbar() {
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
-        {me && (
+        {me ? (
           <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-(--bg-secondary) border border-(--border) backdrop-blur-md">
             <img src={me.avatar_url} alt={me.login} className="w-7 h-7 rounded-full ring-2 ring-(--primary)/30" />
             <span className="text-sm font-semibold text-(--text-primary)">@{me.login}</span>
@@ -42,6 +43,14 @@ export default function Navbar() {
               <LogOut size={16} />
             </button>
           </div>
+        ) : (
+          <button
+            onClick={loginWithGitHub}
+            className="inline-flex items-center gap-2 bg-(--primary) hover:bg-(--primary-hover) text-(--text-inverse) font-extrabold px-5 py-2.5 rounded-xl transition duration-200 ease-in-out text-xs cursor-pointer shadow-md shadow-(--primary)/10 select-none"
+          >
+            <Github size={14} />
+            Get Started
+          </button>
         )}
       </div>
     </nav>

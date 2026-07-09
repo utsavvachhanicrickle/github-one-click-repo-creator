@@ -24,9 +24,11 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const getUniqueSuggestedRepoName = () => 'repo-' + Math.floor(100000 + Math.random() * 900000);
+
   // Modal States
   const [showModal, setShowModal] = useState(false);
-  const [repoName, setRepoName] = useState('my-new-repo');
+  const [repoName, setRepoName] = useState(getUniqueSuggestedRepoName);
   const [isPrivate, setIsPrivate] = useState(false);
   const [description, setDescription] = useState('Website generated from my builder');
   const [creating, setCreating] = useState(false);
@@ -70,7 +72,7 @@ export default function Dashboard() {
       })).unwrap();
 
       // On success, reset form, close modal, and refresh list
-      setRepoName('my-new-repo');
+      setRepoName(getUniqueSuggestedRepoName());
       setIsPrivate(false);
       setDescription('Website generated from my builder');
       setShowModal(false);
@@ -172,6 +174,7 @@ export default function Dashboard() {
                 onClick={() => {
                   setShowModal(false);
                   setCreateError('');
+                  setRepoName(getUniqueSuggestedRepoName());
                 }}
                 disabled={creating}
                 className="text-(--text-secondary) hover:text-(--text-primary) hover:scale-110 active:scale-95 transition cursor-pointer"
@@ -243,6 +246,7 @@ export default function Dashboard() {
                   onClick={() => {
                     setShowModal(false);
                     setCreateError('');
+                    setRepoName(getUniqueSuggestedRepoName());
                   }}
                   disabled={creating}
                   className="px-4 py-2.5 rounded-xl border border-(--border) bg-(--bg-primary) text-xs font-bold text-(--text-secondary) hover:bg-(--bg-secondary) transition cursor-pointer"

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PlusCircle, FileText, CheckCircle, Trash2, AlertCircle } from 'lucide-react';
 
-export default function ChangesPreview({ summary }) {
+export default function ChangesPreview({ summary, selectedPaths = new Set(), onTogglePath }) {
   if (!summary) return null;
 
   const { added = [], modified = [], deleted = [], unchangedCount = 0, ignoredCount = 0 } = summary;
@@ -36,13 +36,23 @@ export default function ChangesPreview({ summary }) {
               </span>
               <div className="space-y-1">
                 {added.map((path) => (
-                  <div
+                  <label
                     key={path}
-                    className="p-3 rounded-xl bg-(--bg-secondary)/40 border border-(--border) hover:border-(--success-border) text-xs font-mono text-(--text-primary) break-all flex items-center gap-2"
+                    className="p-3 rounded-xl bg-(--bg-secondary)/40 border border-(--border) hover:border-(--success-border) text-xs font-mono text-(--text-primary) break-all flex items-center justify-between gap-3 cursor-pointer select-none group transition"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-(--success)" />
-                    {path}
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-(--success)" />
+                      <span>{path}</span>
+                    </div>
+                    {onTogglePath && (
+                      <input
+                        type="checkbox"
+                        checked={selectedPaths.has(path)}
+                        onChange={() => onTogglePath(path)}
+                        className="w-4 h-4 rounded border-(--border) text-(--primary) focus:ring-(--primary) cursor-pointer accent-(--primary)"
+                      />
+                    )}
+                  </label>
                 ))}
               </div>
             </div>
@@ -56,13 +66,23 @@ export default function ChangesPreview({ summary }) {
               </span>
               <div className="space-y-1">
                 {modified.map((path) => (
-                  <div
+                  <label
                     key={path}
-                    className="p-3 rounded-xl bg-(--bg-secondary)/40 border border-(--border) hover:border-amber-500/20 text-xs font-mono text-(--text-primary) break-all flex items-center gap-2"
+                    className="p-3 rounded-xl bg-(--bg-secondary)/40 border border-(--border) hover:border-amber-500/20 text-xs font-mono text-(--text-primary) break-all flex items-center justify-between gap-3 cursor-pointer select-none group transition"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                    {path}
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span>{path}</span>
+                    </div>
+                    {onTogglePath && (
+                      <input
+                        type="checkbox"
+                        checked={selectedPaths.has(path)}
+                        onChange={() => onTogglePath(path)}
+                        className="w-4 h-4 rounded border-(--border) text-(--primary) focus:ring-(--primary) cursor-pointer accent-(--primary)"
+                      />
+                    )}
+                  </label>
                 ))}
               </div>
             </div>
@@ -76,13 +96,23 @@ export default function ChangesPreview({ summary }) {
               </span>
               <div className="space-y-1">
                 {deleted.map((path) => (
-                  <div
+                  <label
                     key={path}
-                    className="p-3 rounded-xl bg-(--bg-secondary)/40 border border-(--border) hover:border-(--danger-border) text-xs font-mono text-(--text-primary) break-all flex items-center gap-2"
+                    className="p-3 rounded-xl bg-(--bg-secondary)/40 border border-(--border) hover:border-(--danger-border) text-xs font-mono text-(--text-primary) break-all flex items-center justify-between gap-3 cursor-pointer select-none group transition"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-(--danger)" />
-                    {path}
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-(--danger)" />
+                      <span>{path}</span>
+                    </div>
+                    {onTogglePath && (
+                      <input
+                        type="checkbox"
+                        checked={selectedPaths.has(path)}
+                        onChange={() => onTogglePath(path)}
+                        className="w-4 h-4 rounded border-(--border) text-(--primary) focus:ring-(--primary) cursor-pointer accent-(--primary)"
+                      />
+                    )}
+                  </label>
                 ))}
               </div>
             </div>

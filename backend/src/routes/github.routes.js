@@ -9,7 +9,8 @@ import {
   getRepoBranches,
   createBranch,
   compareUpload,
-  commitUpload
+  commitUpload,
+  renameRemoteFlutterApp
 } from '../controllers/github.controller.js';
 
 const router = express.Router();
@@ -30,5 +31,6 @@ router.get('/repos/:owner/:repo/branches', requireGithubLogin, getRepoBranches);
 router.post('/repos/:owner/:repo/branches', requireGithubLogin, createBranch);
 router.post('/repos/:owner/:repo/compare-upload', requireGithubLogin, upload.any(), compareUpload);
 router.post('/repos/:owner/:repo/commit-upload', requireGithubLogin, upload.any(), commitUpload);
+router.post('/repos/:owner/:repo/rename-remote-flutter', requireGithubLogin, renameRemoteFlutterApp);
 
 export default router;

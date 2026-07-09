@@ -1,6 +1,8 @@
+import { Link } from 'react-router-dom';
+
 export default function Logo() {
   return (
-    <div className="flex items-center gap-3 select-none">
+    <Link to="/" className="flex items-center gap-3 select-none hover:opacity-90 transition duration-200 ease-in-out cursor-pointer">
       <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-(--bg-secondary) border border-(--border) shadow-xs shrink-0">
         {/* Glow indicator behind logo */}
         <div className="absolute inset-0.5 rounded-lg bg-linear-to-tr from-(--primary) to-(--accent) opacity-10 blur-xs" />
@@ -30,6 +32,6 @@ export default function Logo() {
       <span className="font-black text-2xl tracking-tight bg-linear-to-r from-(--primary) to-(--accent) bg-clip-text text-transparent">
         RepoCreator
       </span>
-    </div>
+    </Link>
   );
 }
