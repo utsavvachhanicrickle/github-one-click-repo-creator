@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* @variant dark (&:where([data-theme="dark"], [data-theme="dark"] *)); */
+
+:root {
+  --bg: #f0f2f5;
+  --bg-app: #eae6df;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f0f2f5;
+  --bg-chat: #efeae2;
+  --bg-active: #ebebeb;
+  
+  --nav-bar: #f0f2f5;
+  --sidebar: #ffffff;
+  --header: #f0f2f5;
+  --sidebar-primary:  #142A32;
+
+  --text-primary: #111b21;
+  --text-secondary: #667781;
+  --text-inverse: #ffffff;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --accent: #9333ea;
+
+  --border: #e9edef;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  
+  --glass: rgba(255, 255, 255, 0.8);
+
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-border: rgba(239, 68, 68, 0.2);
+
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-border: rgba(16, 185, 129, 0.2);
+
+  --glow-1: rgba(79, 70, 229, 0.05);
+  --glow-2: rgba(147, 51, 234, 0.05);
+}
+
+/* ================= DARK THEME ================= */
+[data-theme="dark"] {
+  --bg: #0c1317;
+  --bg-app: #0c1317;
+  --bg-primary: #111b21;
+  --bg-secondary: #202c33;
+  --bg-chat: #0b141a;
+  --bg-active: #2a3942;
+  
+  --nav-bar: #202c33;
+  --sidebar: #111b21;
+  --header: #202c33;
+  --sidebar-primary: #111b21;
+
+  --text-primary: #e9edef;
+  --text-secondary: #8696a0;
+  --text-inverse: #111b21;
+
+  --primary: #818cf8;
+  --primary-hover: #6366f1;
+  --accent: #a855f7;
+
+  --border: #222d34;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  
+  --glass: rgba(17, 27, 33, 0.8);
+
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.1);
+  --danger-border: rgba(248, 113, 113, 0.2);
+
+  --success: #34d399;
+  --success-bg: rgba(52, 211, 153, 0.1);
+  --success-border: rgba(52, 211, 153, 0.2);
+
+  --glow-1: rgba(129, 140, 248, 0.1);
+  --glow-2: rgba(168, 85, 247, 0.1);
+}
+
+/* ================= BASE ================= */
+body {
+  background-color: var(--bg);
+  color: var(--text-primary); 
+  transition: background-color 0.3s ease, color 0.3s ease;
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
