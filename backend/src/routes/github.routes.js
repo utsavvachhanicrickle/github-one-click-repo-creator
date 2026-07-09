@@ -3,7 +3,6 @@ import multer from 'multer';
 import { requireGithubLogin } from '../middleware/auth.middleware.js';
 import {
   createWebsiteRepo,
-  getMyRepositories,
   getUserRepositories,
   getUserRepos,
   getRepoBranches,
@@ -22,7 +21,6 @@ const upload = multer({
 });
 
 router.post('/create-website-repo', requireGithubLogin, createWebsiteRepo);
-router.get('/my-repositories', requireGithubLogin, getMyRepositories);
 router.get('/user-repositories', requireGithubLogin, getUserRepositories);
 
 // Active repo detail & commit workflow routes

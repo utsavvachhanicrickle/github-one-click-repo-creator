@@ -5,7 +5,6 @@ import { createStarterWebsiteFiles } from '../services/starterTemplate.service.j
 import { getRepositoriesFromN8n } from '../services/n8n.service.js';
 import { createRepoWithFiles } from '../services/githubRepo.service.js';
 import { User } from '../models/User.js';
-import { Repository } from '../models/Repository.js';
 
 const createWebsiteSchema = z.object({
   repoName: z
@@ -40,22 +39,6 @@ export async function createWebsiteRepo(req, res, next) {
       files
     });
 
-    // Save created repository information in MongoDB
-    const dbUser = await User.findOne({ githubId: user.id });
-    if (dbUser) {
-      await Repository.create({
-        userId: dbUser._id,
-        repoName: input.repoName,
-        description: input.description,
-        isPrivate: input.isPrivate,
-        htmlUrl: result.htmlUrl,
-        cloneUrl: result.cloneUrl
-      });
-      console.log(`[database] Saved new repository metadata to MongoDB: ${user.login}/${input.repoName}`);
-    } else {
-      console.warn(`[database] User ${user.login} not found, skipped saving repository metadata.`);
-    }
-
     res.status(201).json({
       message: 'Repository created successfully.',
       repo: result,
@@ -74,21 +57,6 @@ export async function createWebsiteRepo(req, res, next) {
       });
     }
 
-    next(err);
-  }
-}
-
-export async function getMyRepositories(req, res, next) {
-  try {
-    const user = req.session.githubUser;
-    const dbUser = await User.findOne({ githubId: user.id });
-    if (!dbUser) {
-      return res.status(404).json({ message: 'User not found in database.' });
-    }
-    const repos = await Repository.find({ userId: dbUser._id }).sort({ createdAt: -1 });
-    console.log(`[database] Fetched ${repos.length} app-created repositories for user: ${user.login}`);
-    res.json(repos);
-  } catch (err) {
     next(err);
   }
 }
