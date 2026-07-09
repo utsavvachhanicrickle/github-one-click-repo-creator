@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Github, GitBranch, ShieldAlert, CheckCircle2, ExternalLink, Plus, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Github, GitBranch, ShieldAlert, CheckCircle2, ExternalLink, Plus, X, Rocket } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import BranchSelector from '../components/BranchSelector.jsx';
 import FolderUpload from '../components/FolderUpload.jsx';
@@ -35,6 +35,9 @@ export default function RepoDetail() {
   
   const [successResult, setSuccessResult] = useState(null);
   const [error, setError] = useState('');
+
+  // Flutter App Rename State
+  const [flutterAppName, setFlutterAppName] = useState('');
 
   // Create Branch States
   const [showNewBranchInput, setShowNewBranchInput] = useState(false);
@@ -113,6 +116,7 @@ export default function RepoDetail() {
       const formData = new FormData();
       formData.append('branch', selectedBranch);
       formData.append('includeDeletions', includeDeletions.toString());
+      formData.append('flutterAppName', flutterAppName.trim());
       
       const relativePaths = [];
       files.forEach((file) => {
@@ -139,6 +143,7 @@ export default function RepoDetail() {
       formData.append('branch', selectedBranch);
       formData.append('commitMessage', commitMessage.trim() || 'Upload project files from dashboard');
       formData.append('includeDeletions', includeDeletions.toString());
+      formData.append('flutterAppName', flutterAppName.trim());
 
       const relativePaths = [];
       files.forEach((file) => {
@@ -234,6 +239,13 @@ export default function RepoDetail() {
                 </div>
               </div>
 
+              {successResult.summary.renamedTo && (
+                <div className="p-4 rounded-2xl bg-(--primary)/10 border border-(--primary)/20 text-xs font-bold text-(--primary) flex items-center gap-2 select-none">
+                  <Rocket size={16} />
+                  <span>Flutter application renamed to: <span className="font-mono text-xs underline bg-(--bg-secondary) px-2 py-0.5 rounded-md text-(--text-primary)">{successResult.summary.renamedTo}</span></span>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row gap-3 pt-2 select-none">
                 <a
                   href={successResult.commitUrl}
@@ -326,6 +338,27 @@ export default function RepoDetail() {
               )}
 
               <FolderUpload onFolderSelect={handleFolderSelect} />
+
+              {/* Flutter App Rename Input */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-(--text-primary) select-none">
+                  Flutter App Rename (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={flutterAppName}
+                  onChange={(e) => {
+                    setFlutterAppName(e.target.value);
+                    setComparisonResult(null);
+                  }}
+                  placeholder="e.g. utsav_vachhani"
+                  disabled={committing || comparing}
+                  className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3.5 text-xs text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
+                />
+                <p className="text-[10px] text-(--text-secondary) select-none leading-relaxed">
+                  If uploaded files contain a Flutter application, this automatically renames the app inside <code className="font-bold text-(--text-primary)">AppInfo.xcconfig</code> and <code className="font-bold text-(--text-primary)">AndroidManifest.xml</code>.
+                </p>
+              </div>
 
               <div className="flex items-center gap-3 select-none">
                 <input

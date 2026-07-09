@@ -5,7 +5,7 @@ export default function RepoCard({ repo }) {
   return (
     <div className="p-6 rounded-3xl bg-(--bg-primary) border border-(--border) hover:border-(--primary) transition shadow-xs hover:shadow-md flex flex-col justify-between h-full group relative overflow-hidden">
       {/* Glow background indicator on hover */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.03] transition-opacity duration-300 pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.03] transition-opacity duration-300 pointer-events-none" />
 
       <div>
         <div className="flex items-start justify-between gap-4 mb-4 select-none">

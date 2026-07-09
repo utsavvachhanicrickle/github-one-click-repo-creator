@@ -163,6 +163,41 @@ function calculateGitSha(buffer) {
   return hash.digest('hex');
 }
 
+// Intercept and rename Flutter App Names in memory
+function processFlutterRenames(validUploadedFiles, flutterAppName) {
+  if (!flutterAppName) return null;
+
+  const cleanAppName = flutterAppName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+  if (!cleanAppName) return null;
+
+  let didRename = false;
+  for (const item of validUploadedFiles) {
+    const p = item.path.toLowerCase();
+    if (p.endsWith('macos/runner/configs/appinfo.xcconfig')) {
+      let content = item.file.buffer.toString('utf8');
+      // Replace PRODUCT_NAME = ...
+      content = content.replace(/PRODUCT_NAME\s*=\s*[a-zA-Z0-9._-]+/g, `PRODUCT_NAME = ${cleanAppName}`);
+      item.file.buffer = Buffer.from(content, 'utf8');
+      item.file.size = item.file.buffer.length;
+      // Recompute SHA
+      item.sha = calculateGitSha(item.file.buffer);
+      didRename = true;
+      console.log(`[flutter-rename] Renamed PRODUCT_NAME in AppInfo.xcconfig to: ${cleanAppName}`);
+    } else if (p.endsWith('android/app/src/main/androidmanifest.xml')) {
+      let content = item.file.buffer.toString('utf8');
+      // Replace android:label="..."
+      content = content.replace(/android:label="[^"]*"/g, `android:label="${cleanAppName}"`);
+      item.file.buffer = Buffer.from(content, 'utf8');
+      item.file.size = item.file.buffer.length;
+      // Recompute SHA
+      item.sha = calculateGitSha(item.file.buffer);
+      didRename = true;
+      console.log(`[flutter-rename] Renamed android:label in AndroidManifest.xml to: ${cleanAppName}`);
+    }
+  }
+  return didRename ? cleanAppName : null;
+}
+
 // 1. Get all accessible user repositories
 export async function getUserRepos(req, res, next) {
   try {
@@ -312,6 +347,9 @@ export async function compareUpload(req, res, next) {
       });
     }
 
+    const flutterAppName = req.body.flutterAppName;
+    const renamedTo = processFlutterRenames(validUploadedFiles, flutterAppName);
+
     const remoteFilesMap = new Map();
     const remotePaths = new Set();
     let latestCommitSha = null;
@@ -345,10 +383,7 @@ export async function compareUpload(req, res, next) {
         }
       }
     } catch (err) {
-      // If branch does not exist or repository is empty, treat remote tree as empty (all uploads are added)
-      if (err.status !== 404 && err.status !== 409) {
-        throw err;
-      }
+      console.warn(`[compare] Could not fetch remote tree (status: ${err.status}), treating remote as empty:`, err.message);
     }
 
     const added = [];
@@ -388,7 +423,8 @@ export async function compareUpload(req, res, next) {
         modified,
         deleted: includeDeletions === 'true' ? deleted : [],
         unchangedCount: unchanged.length,
-        ignoredCount
+        ignoredCount,
+        renamedTo
       }
     });
 
@@ -443,6 +479,9 @@ export async function commitUpload(req, res, next) {
       });
     }
 
+    const flutterAppName = req.body.flutterAppName;
+    const renamedTo = processFlutterRenames(validUploadedFiles, flutterAppName);
+
     let latestCommitSha = null;
     let isInitialCommit = false;
 
@@ -453,12 +492,16 @@ export async function commitUpload(req, res, next) {
         ref: `heads/${branch}`
       });
       latestCommitSha = refRes.data.object.sha;
+
+      // Verify commit actually exists on GitHub (fails with 500/404/409 if empty repo or invalid head ref)
+      await octokit.git.getCommit({
+        owner,
+        repo,
+        commit_sha: latestCommitSha
+      });
     } catch (err) {
-      if (err.status === 404 || err.status === 409) {
-        isInitialCommit = true;
-      } else {
-        throw err;
-      }
+      console.warn(`[commit] Branch ref or commit not resolvable (status: ${err.status}), setting isInitialCommit = true:`, err.message);
+      isInitialCommit = true;
     }
 
     let remoteBlobs = [];
@@ -618,7 +661,8 @@ export async function commitUpload(req, res, next) {
         modified: modifiedPaths.length,
         deleted: actuallyDeleting ? deletedPaths.length : 0,
         unchanged: unchangedPaths.length,
-        ignored: ignoredCount
+        ignored: ignoredCount,
+        renamedTo
       }
     });
 
