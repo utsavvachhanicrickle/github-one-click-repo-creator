@@ -85,7 +85,8 @@ function isIgnoredOrDangerousPath(relativePath) {
     '.env',
     '.env.local',
     '.env.production',
-    '.DS_Store'
+    '.DS_Store',
+    'package-lock.json'
   ]);
 
   for (const segment of segments) {

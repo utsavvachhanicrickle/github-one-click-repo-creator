@@ -4,13 +4,14 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import MongoStore from 'connect-mongo';
+import pgSession from 'connect-pg-simple';
 import { config } from './config.js';
-import { connectDB } from './db.js';
+import { connectDB, pool } from './db.js';
 import apiRoutes from './routes/api.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 
 const app = express();
+const PgSessionStore = pgSession(session);
 
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: false }));
@@ -31,10 +32,9 @@ app.use(
     secret: config.sessionSecret,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/github-repo-creator',
-      collectionName: 'sessions',
-      touchAfter: 3600
+    store: new PgSessionStore({
+      pool,
+      tableName: 'session'
     }),
     cookie: {
       httpOnly: true,

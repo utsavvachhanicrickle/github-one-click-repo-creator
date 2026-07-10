@@ -15,7 +15,8 @@ export default function FolderUpload({ onFolderSelect }) {
     '.env',
     '.env.local',
     '.env.production',
-    '.DS_Store'
+    '.DS_Store',
+    'package-lock.json'
   ]);
 
   const handleFolderChange = (e) => {
