@@ -555,7 +555,7 @@ export default function RepoDetail() {
                     <button
                       onClick={handleCommit}
                       disabled={committing}
-                      className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) font-black py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
+                      className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) hover:text-(--text-primary) font-black py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
                     >
                       {committing ? (
                         <>
