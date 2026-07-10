@@ -25,11 +25,6 @@ app.use(
   })
 );
 
-// Health check BEFORE session middleware (no DB needed)
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true });
-});
-
 app.use(
   session({
     name: 'repo_creator_sid',
@@ -39,9 +34,7 @@ app.use(
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/github-repo-creator',
       collectionName: 'sessions',
-      touchAfter: 3600,
-      autoRemove: 'interval',
-      autoRemoveInterval: 10
+      touchAfter: 3600
     }),
     cookie: {
       httpOnly: true,
@@ -52,18 +45,20 @@ app.use(
   })
 );
 
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.use('/api', apiRoutes);
 
 app.use(errorHandler);
 
-// Connect to DB at module load time (works for both local and Vercel serverless)
-await connectDB();
-
-// For local development
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(config.port, () => {
-    console.log(`Backend running on http://localhost:${config.port}`);
-  });
-}
+connectDB().then(() => {
+  if (!process.env.VERCEL) {
+    app.listen(config.port, () => {
+      console.log(`Backend running on http://localhost:${config.port}`);
+    });
+  }
+});
 
 export default app;

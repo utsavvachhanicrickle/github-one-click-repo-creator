@@ -40,18 +40,6 @@ export async function createWebsiteRepo(payload) {
   return data;
 }
 
-export async function getMyRepositories() {
-  const res = await fetch(`${API_BASE_URL}/api/github/my-repositories`, {
-    credentials: 'include'
-  });
-
-  if (!res.ok) {
-    throw new Error('Failed to fetch repositories history');
-  }
-
-  return res.json();
-}
-
 
 export async function getUserRepositories() {
   const res = await fetch(`${API_BASE_URL}/api/github/user-repositories`, {
