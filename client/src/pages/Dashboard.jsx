@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Search, AlertCircle, FolderGit2, Plus, Rocket, X, GitFork, CheckCircle, ArrowUpCircle, ArrowDownCircle, AlertTriangle } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import RepoCard from '../components/RepoCard.jsx';
-import { getMyRepos, getForkFamilies } from '../api/githubApi.js';
+import { getMyRepos, getForkFamilies } from '../services/github.service.js';
 import { createRepo } from '../store/slices/repoSlice.js';
 
 function normalizeRepoName(value) {

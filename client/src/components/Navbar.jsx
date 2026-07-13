@@ -5,7 +5,7 @@ import { logoutUser } from '../store/slices/authSlice.js';
 import { clearRepoState } from '../store/slices/repoSlice.js';
 import { DarkModeContext } from '../context/darkModeContext.jsx';
 import Logo from './Logo.jsx';
-import { loginWithGitHub } from '../services/api.js';
+import { loginWithGitHub } from '../services/auth.service.js';
 
 export default function Navbar() {
   const dispatch = useDispatch();

@@ -2,7 +2,7 @@ import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { Github, Rocket, FolderGit2, GitBranch, RefreshCw, Zap, ShieldCheck } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
-import { loginWithGitHub } from '../services/api.js';
+import { loginWithGitHub } from '../services/auth.service.js';
 
 export default function Home() {
   const { me } = useSelector((state) => state.auth);

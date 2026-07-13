@@ -1,5 +1,5 @@
 import { Github } from 'lucide-react';
-import { loginWithGitHub } from '../services/api.js';
+import { loginWithGitHub } from '../services/auth.service.js';
 
 export default function Login() {
   return (

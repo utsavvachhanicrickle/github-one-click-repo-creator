@@ -14,7 +14,7 @@ import {
   Github
 } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
-import { getForkFamilies, getRepoBranches, compareForkBranch, mergeForkBranch } from '../api/githubApi.js';
+import { getForkFamilies, getRepoBranches, compareForkBranch, mergeForkBranch } from '../services/github.service.js';
 
 // Helper to render status badge
 const renderStatusBadge = (status) => {

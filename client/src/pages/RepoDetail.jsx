@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar.jsx';
 import BranchSelector from '../components/BranchSelector.jsx';
 import FolderUpload from '../components/FolderUpload.jsx';
 import ChangesPreview from '../components/ChangesPreview.jsx';
-import { getRepoBranches, compareFolderUpload, commitFolderUpload, createRepoBranch, renameRemoteFlutterApp } from '../api/githubApi.js';
+import { getRepoBranches, compareFolderUpload, commitFolderUpload, createRepoBranch, renameRemoteFlutterApp } from '../services/github.service.js';
 
 function getCleanRelativePath(file) {
   const cleanPath = (file.webkitRelativePath || file.name).replace(/\\/g, '/');

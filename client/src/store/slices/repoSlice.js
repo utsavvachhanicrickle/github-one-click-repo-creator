@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getUserRepositories, createWebsiteRepo } from '../../services/api.js';
+import { getUserRepositories, createWebsiteRepo } from '../../services/github.service.js';
 import { showToast } from './toastSlice.js';
 
 export const fetchGitHubRepos = createAsyncThunk('repos/fetchGitHubRepos', async (_, { rejectWithValue }) => {
