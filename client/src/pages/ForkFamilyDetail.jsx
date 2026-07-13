@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import { getForkFamilies, getRepoBranches, compareForkBranch, mergeForkBranch } from '../services/github.service.js';
+import { useSelector } from 'react-redux';
 
 // Helper to render status badge
 const renderStatusBadge = (status) => {
@@ -300,6 +301,7 @@ export default function ForkFamilyDetail() {
   const [family, setFamily] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { me } = useSelector((state) => state.auth);
 
   const loadData = async () => {
     try {
@@ -367,19 +369,53 @@ export default function ForkFamilyDetail() {
             {/* Header info */}
             <div className="bg-(--bg-primary) border border-(--border) rounded-3xl p-8 shadow-xs relative overflow-hidden">
               <div className="absolute right-0 top-0 w-32 h-32 bg-(--primary)/5 rounded-full blur-2xl pointer-events-none" />
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-2">
-                  <span className="text-[10px] uppercase font-black text-(--primary) tracking-wider flex items-center gap-1">
-                    <GitFork size={10} />
-                    Parent Repository
-                  </span>
-                  <h2 className="text-3xl font-black text-(--text-primary) tracking-tight">
-                    {family.parent.fullName}
-                  </h2>
-                  <p className="text-xs text-(--text-secondary) font-semibold flex items-center gap-2">
-                    Default Branch: <span className="font-mono bg-(--bg-secondary) px-2 py-0.5 rounded text-(--text-primary) font-bold">{family.parent.defaultBranch}</span>
-                  </p>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-12 flex-1">
+                  
+                  {/* Original Repository */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] uppercase font-black text-(--primary) tracking-wider flex items-center gap-1 select-none">
+                      <GitFork size={10} />
+                      Original Repository (Parent)
+                    </span>
+                    <h2 className="text-2xl font-black text-(--text-primary) tracking-tight">
+                      {family.parent.fullName}
+                    </h2>
+                    <p className="text-xs text-(--text-secondary) font-semibold">
+                      Branch: <span className="font-mono bg-(--bg-secondary) px-2 py-0.5 rounded text-(--text-primary) font-bold">{family.parent.defaultBranch}</span>
+                    </p>
+                  </div>
+
+                  {/* Flow Arrow Connection */}
+                  {family.forks.find((f) => me && f.owner.toLowerCase() === me.login.toLowerCase()) && (
+                    <div className="hidden sm:flex items-center text-(--text-secondary) select-none">
+                      <div className="w-8 h-[2px] bg-(--border) relative">
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 rotate-45 w-2 h-2 border-t-2 border-r-2 border-(--border)" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Your Forked Repository */}
+                  {(() => {
+                    const myFork = family.forks.find((f) => me && f.owner.toLowerCase() === me.login.toLowerCase());
+                    return myFork ? (
+                      <div className="space-y-2">
+                        <span className="text-[10px] uppercase font-black text-emerald-500 tracking-wider flex items-center gap-1 select-none">
+                          <CheckCircle size={10} />
+                          Your Repository (Fork)
+                        </span>
+                        <h2 className="text-2xl font-black text-(--text-primary) tracking-tight">
+                          {myFork.fullName}
+                        </h2>
+                        <p className="text-xs text-(--text-secondary) font-semibold">
+                          Branch: <span className="font-mono bg-(--bg-secondary) px-2 py-0.5 rounded text-(--text-primary) font-bold">{myFork.branch}</span>
+                        </p>
+                      </div>
+                    ) : null;
+                  })()}
+
                 </div>
+
                 <a
                   href={family.parent.htmlUrl}
                   target="_blank"
@@ -387,7 +423,7 @@ export default function ForkFamilyDetail() {
                   className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-(--border) bg-(--bg-secondary) text-sm font-black text-(--text-primary) hover:border-(--primary) hover:text-(--primary) transition active:scale-98 select-none shrink-0"
                 >
                   <Github size={16} />
-                  View Parent GitHub
+                  View Original GitHub
                   <ExternalLink size={14} />
                 </a>
               </div>

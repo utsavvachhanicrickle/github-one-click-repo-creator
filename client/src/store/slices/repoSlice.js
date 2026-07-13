@@ -1,11 +1,20 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getUserRepositories, createWebsiteRepo } from '../../services/github.service.js';
+import { getUserRepositories, createWebsiteRepo, getForkFamilies } from '../../services/github.service.js';
 import { showToast } from './toastSlice.js';
 
 export const fetchGitHubRepos = createAsyncThunk('repos/fetchGitHubRepos', async (_, { rejectWithValue }) => {
   try {
     const repos = await getUserRepositories();
     return repos;
+  } catch (error) {
+    return rejectWithValue(error.message);
+  }
+});
+
+export const fetchForkFamilies = createAsyncThunk('repos/fetchForkFamilies', async (_, { rejectWithValue }) => {
+  try {
+    const families = await getForkFamilies();
+    return families;
   } catch (error) {
     return rejectWithValue(error.message);
   }
@@ -20,6 +29,7 @@ export const createRepo = createAsyncThunk(
       dispatch(showToast({ message: `Repository "${payload.repoName}" created successfully!`, type: 'success' }));
       // Refresh lists
       dispatch(fetchGitHubRepos());
+      dispatch(fetchForkFamilies());
       return data.repo;
     } catch (error) {
       dispatch(showToast({ message: error.message || 'Failed to create repository', type: 'error' }));
@@ -30,6 +40,7 @@ export const createRepo = createAsyncThunk(
 
 const initialState = {
   allGitHubRepos: [],
+  forkFamilies: [],
   gitHubLoading: false,
   creating: false,
   createdRepo: null,
@@ -64,6 +75,10 @@ const repoSlice = createSlice({
       })
       .addCase(fetchGitHubRepos.rejected, (state) => {
         state.gitHubLoading = false;
+      })
+      // fetchForkFamilies
+      .addCase(fetchForkFamilies.fulfilled, (state, action) => {
+        state.forkFamilies = action.payload || [];
       })
       // createRepo
       .addCase(createRepo.pending, (state) => {

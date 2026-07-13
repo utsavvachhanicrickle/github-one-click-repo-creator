@@ -1,9 +1,25 @@
-import { Link } from 'react-router-dom';
-import { FolderGit2, Calendar, GitFork, ArrowUpRight } from 'lucide-react';
+import { Link, useNavigate } from "react-router-dom";
+import { FolderGit2, Calendar, GitFork, ArrowUpRight } from "lucide-react";
 
-export default function RepoCard({ repo }) {
+export default function RepoCard({ repo, parent }) {
+  const navigate = useNavigate();
+  const linkTo = parent
+    ? `/dashboard/fork-families/${parent.owner}/${parent.repo}`
+    : `/dashboard/repos/${repo.owner}/${repo.name}`;
+
+  const handleCardClick = (e) => {
+    // If the click is inside an interactive element, do not trigger card navigation
+    if (e.target.closest("a") || e.target.closest("button")) {
+      return;
+    }
+    navigate(linkTo);
+  };
+
   return (
-    <div className="p-6 rounded-3xl bg-(--bg-primary) border border-(--border) hover:border-(--primary) transition shadow-xs hover:shadow-md flex flex-col justify-between h-full group relative overflow-hidden">
+    <div
+      onClick={handleCardClick}
+      className="p-6 rounded-3xl bg-(--bg-primary) border border-(--border) hover:border-(--primary) transition shadow-xs hover:shadow-md flex flex-col justify-between h-full group relative overflow-hidden cursor-pointer select-none"
+    >
       {/* Glow background indicator on hover */}
       <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.03] transition-opacity duration-300 pointer-events-none" />
 
@@ -25,13 +41,36 @@ export default function RepoCard({ repo }) {
           </div>
         </div>
 
-        <h4 className="text-lg font-extrabold text-(--text-primary) tracking-tight mb-2 truncate group-hover:text-(--primary) transition-colors">
-          {repo.name}
-        </h4>
-        
-        <p className="text-xs text-(--text-secondary) font-mono mb-4">
-          Owner: <span className="font-semibold text-(--text-primary)">@{repo.owner}</span>
-        </p>
+        {parent ? (
+          <div className="space-y-1 mb-2">
+            <span className="text-[10px] uppercase font-black text-(--primary) tracking-wider flex items-center gap-1 select-none">
+              <GitFork size={10} />
+              Original Repository
+            </span>
+            <h4 className="text-lg font-extrabold text-(--text-primary) tracking-tight truncate group-hover:text-(--primary) transition-colors">
+              {repo.owner}/{repo.name}
+            </h4>
+            <p className="text-xs text-(--text-secondary) font-semibold">
+              Frok from :{" "}
+              <span className="font-bold text-(--text-primary)">
+                {" "}
+                {parent.fullName}
+              </span>
+            </p>
+          </div>
+        ) : (
+          <>
+            <h4 className="text-lg font-extrabold text-(--text-primary) tracking-tight mb-2 truncate group-hover:text-(--primary) transition-colors">
+              {repo.name}
+            </h4>
+            <p className="text-xs text-(--text-secondary) font-mono mb-4">
+              Owner:{" "}
+              <span className="font-semibold text-(--text-primary)">
+                @{repo.owner}
+              </span>
+            </p>
+          </>
+        )}
 
         {repo.language && (
           <span className="inline-block text-[11px] font-bold bg-(--bg-secondary) border border-(--border) text-(--text-secondary) px-2.5 py-1 rounded-lg mb-4">
@@ -53,7 +92,11 @@ export default function RepoCard({ repo }) {
         </div>
 
         <Link
-          to={`/dashboard/repos/${repo.owner}/${repo.name}`}
+          to={
+            parent
+              ? `/dashboard/fork-families/${parent.owner}/${parent.repo}`
+              : `/dashboard/repos/${repo.owner}/${repo.name}`
+          }
           className="mt-6 w-full bg-(--bg-secondary) hover:bg-(--primary) text-(--text-primary) hover:text-(--text-inverse) font-bold py-3.5 rounded-xl border border-(--border) hover:border-transparent flex items-center justify-center gap-2 transition active:scale-[0.99] cursor-pointer shadow-xs select-none"
         >
           Open Repository
