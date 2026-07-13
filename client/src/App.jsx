@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import Home from './pages/Home.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import RepoDetail from './pages/RepoDetail.jsx';
+import ForkFamilyDetail from './pages/ForkFamilyDetail.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import PublicRoute from './components/PublicRoute.jsx';
 import Toast from './components/Toast.jsx';
@@ -50,6 +51,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/fork-families/:parentOwner/:parentRepo"
+          element={
+            <ProtectedRoute>
+              <ForkFamilyDetail />
             </ProtectedRoute>
           }
         />

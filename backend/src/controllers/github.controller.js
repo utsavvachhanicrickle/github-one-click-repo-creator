@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { Octokit } from '@octokit/rest';
 import crypto from 'crypto';
 import { createStarterWebsiteFiles } from '../services/starterTemplate.service.js';
-import { getRepositoriesFromN8n } from '../services/n8n.service.js';
 import { createRepoWithFiles } from '../services/githubRepo.service.js';
 import { User } from '../models/User.js';
 
@@ -149,20 +148,23 @@ function processFlutterRenames(validUploadedFiles, flutterAppName) {
 // 1. Get all accessible user repositories
 export async function getUserRepos(req, res, next) {
   try {
-    const n8nRepos = await getRepositoriesFromN8n(
-      req.session.githubAccessToken,
-      req.session.githubUser?.login
-    );
-
-    if (n8nRepos !== null) {
-      console.log(`[n8n] Successfully fetched user repositories via n8n webhook for /repos: ${req.session.githubUser?.login}`);
-      return res.json(n8nRepos);
-    }
-
-    console.error(`[n8n] Error: Webhook is offline or failed, and direct GitHub fallback is disabled.`);
-    return res.status(503).json({
-      message: 'Failed to fetch repositories: the n8n integration is offline or unconfigured.'
+    const octokit = new Octokit({ auth: req.session.githubAccessToken });
+    const { data: repos } = await octokit.repos.listForAuthenticatedUser({
+      sort: 'updated',
+      per_page: 100
     });
+
+    const formattedRepos = repos.map((r) => ({
+      name: r.name,
+      owner: r.owner.login,
+      isPrivate: r.private,
+      defaultBranch: r.default_branch,
+      updatedAt: r.updated_at,
+      language: r.language,
+      htmlUrl: r.html_url
+    }));
+
+    res.json(formattedRepos);
   } catch (err) {
     next(err);
   }
@@ -777,6 +779,266 @@ export async function renameRemoteFlutterApp(req, res, next) {
         renamedTo: cleanAppName
       }
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// 6. Get all fork families grouped by parent repo
+export async function getForkFamilies(req, res, next) {
+  try {
+    const accessToken = req.session.githubAccessToken;
+    if (!accessToken) {
+      return res.status(401).json({ message: 'GitHub login required.' });
+    }
+
+    const octokit = new Octokit({ auth: accessToken });
+
+    // Fetch up to 100 repositories accessible to the user
+    const { data: repos } = await octokit.repos.listForAuthenticatedUser({
+      sort: 'updated',
+      per_page: 100
+    });
+
+    // Filter repos where repo.fork === true
+    const forkRepos = repos.filter((r) => r.fork === true);
+
+    if (forkRepos.length === 0) {
+      return res.json([]);
+    }
+
+    // Fetch full details of each forked repo to resolve parent repository info
+    const forkDetails = await Promise.all(
+      forkRepos.map(async (fork) => {
+        try {
+          const { data: detail } = await octokit.repos.get({
+            owner: fork.owner.login,
+            repo: fork.name
+          });
+          return detail;
+        } catch (err) {
+          console.warn(`[fork-families] Failed to fetch details for ${fork.owner.login}/${fork.name}:`, err.message);
+          return null;
+        }
+      })
+    );
+
+    const validForks = forkDetails.filter(Boolean);
+
+    // Group forks by parent.full_name
+    const groupsMap = {};
+
+    for (const fork of validForks) {
+      if (!fork.parent) continue;
+      const parentFullName = fork.parent.full_name;
+
+      if (!groupsMap[parentFullName]) {
+        groupsMap[parentFullName] = {
+          parent: {
+            owner: fork.parent.owner.login,
+            repo: fork.parent.name,
+            fullName: parentFullName,
+            defaultBranch: fork.parent.default_branch || 'main',
+            htmlUrl: fork.parent.html_url
+          },
+          forks: []
+        };
+      }
+
+      groupsMap[parentFullName].forks.push(fork);
+    }
+
+    const results = [];
+
+    // Compare branches and build summaries
+    for (const parentFullName of Object.keys(groupsMap)) {
+      const group = groupsMap[parentFullName];
+      const parent = group.parent;
+
+      const summary = {
+        totalForks: group.forks.length,
+        same: 0,
+        ahead: 0,
+        behind: 0,
+        diverged: 0,
+        unknown: 0
+      };
+
+      const mappedForks = await Promise.all(
+        group.forks.map(async (fork) => {
+          const forkOwner = fork.owner.login;
+          const forkRepo = fork.name;
+          const forkBranch = fork.default_branch || 'main';
+          const parentOwner = parent.owner;
+          const parentBranch = parent.defaultBranch;
+
+          let status = 'unknown';
+          let aheadBy = 0;
+          let behindBy = 0;
+          let changedFilesCount = 0;
+
+          try {
+            // Compare base (parent) with head (fork)
+            // basehead format: parentOwner:parentBranch...forkOwner:forkBranch
+            const { data: comparison } = await octokit.repos.compareCommits({
+              owner: forkOwner,
+              repo: forkRepo,
+              base: `${parentOwner}:${parentBranch}`,
+              head: `${forkOwner}:${forkBranch}`
+            });
+
+            aheadBy = comparison.ahead_by || 0;
+            behindBy = comparison.behind_by || 0;
+            changedFilesCount = comparison.files ? comparison.files.length : 0;
+
+            if (aheadBy > 0 && behindBy > 0) {
+              status = 'diverged';
+            } else if (aheadBy > 0) {
+              status = 'ahead';
+            } else if (behindBy > 0) {
+              status = 'behind';
+            } else if (aheadBy === 0 && behindBy === 0) {
+              status = 'same';
+            }
+          } catch (err) {
+            console.warn(`[fork-families] Comparison failed for ${forkOwner}/${forkRepo} against parent ${parentOwner}/${parent.repo}:`, err.message);
+            status = 'unknown';
+          }
+
+          if (summary[status] !== undefined) {
+            summary[status]++;
+          } else {
+            summary.unknown++;
+          }
+
+          return {
+            owner: forkOwner,
+            repo: forkRepo,
+            fullName: fork.full_name,
+            branch: forkBranch,
+            htmlUrl: fork.html_url,
+            status,
+            aheadBy,
+            behindBy,
+            hasUserChanges: aheadBy > 0,
+            needsParentUpdate: behindBy > 0,
+            changedFilesCount
+          };
+        })
+      );
+
+      results.push({
+        parent,
+        summary,
+        forks: mappedForks
+      });
+    }
+
+    res.json(results);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// 7. Compare a specific parent branch with a fork branch
+export async function compareForkBranch(req, res, next) {
+  try {
+    const { parentOwner, parentRepo, parentBranch, forkOwner, forkRepo, forkBranch } = req.query;
+    const accessToken = req.session.githubAccessToken;
+    if (!accessToken) {
+      return res.status(401).json({ message: 'GitHub login required.' });
+    }
+
+    if (!parentOwner || !parentRepo || !parentBranch || !forkOwner || !forkRepo || !forkBranch) {
+      return res.status(400).json({ message: 'Missing comparison parameters.' });
+    }
+
+    const octokit = new Octokit({ auth: accessToken });
+    const { data: comparison } = await octokit.repos.compareCommits({
+      owner: forkOwner,
+      repo: forkRepo,
+      base: `${parentOwner}:${parentBranch}`,
+      head: `${forkOwner}:${forkBranch}`
+    });
+
+    const aheadBy = comparison.ahead_by || 0;
+    const behindBy = comparison.behind_by || 0;
+    const changedFilesCount = comparison.files ? comparison.files.length : 0;
+
+    let status = 'unknown';
+    if (aheadBy > 0 && behindBy > 0) {
+      status = 'diverged';
+    } else if (aheadBy > 0) {
+      status = 'ahead';
+    } else if (behindBy > 0) {
+      status = 'behind';
+    } else if (aheadBy === 0 && behindBy === 0) {
+      status = 'same';
+    }
+
+    res.json({
+      status,
+      aheadBy,
+      behindBy,
+      changedFilesCount
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// 8. Merge parent changes into fork branch
+export async function mergeForkBranch(req, res, next) {
+  try {
+    const { parentOwner, parentRepo, parentBranch, forkOwner, forkRepo, forkBranch } = req.body;
+    const accessToken = req.session.githubAccessToken;
+    if (!accessToken) {
+      return res.status(401).json({ message: 'GitHub login required.' });
+    }
+
+    if (!parentOwner || !parentRepo || !parentBranch || !forkOwner || !forkRepo || !forkBranch) {
+      return res.status(400).json({ message: 'Missing merge parameters.' });
+    }
+
+    const octokit = new Octokit({ auth: accessToken });
+
+    try {
+      // 1. Fetch latest commit SHA from parent branch
+      const { data: parentBranchData } = await octokit.repos.getBranch({
+        owner: parentOwner,
+        repo: parentRepo,
+        branch: parentBranch
+      });
+      const parentCommitSha = parentBranchData.commit.sha;
+
+      // 2. Merge parent commit SHA into fork branch
+      const response = await octokit.repos.merge({
+        owner: forkOwner,
+        repo: forkRepo,
+        base: forkBranch,
+        head: parentCommitSha,
+        commit_message: `Sync: Merge parent ${parentOwner}/${parentRepo}:${parentBranch} (${parentCommitSha}) into ${forkBranch}`
+      });
+
+      res.json({
+        success: true,
+        message: 'Successfully merged parent changes into fork branch.',
+        data: response.data
+      });
+    } catch (mergeErr) {
+      if (mergeErr.status === 409) {
+        return res.status(409).json({
+          message: 'Conflict detected during merge. You must resolve conflicts manually on GitHub.'
+        });
+      }
+      if (mergeErr.status === 204) {
+        return res.json({
+          success: true,
+          message: 'Branch is already up to date with parent.'
+        });
+      }
+      throw mergeErr;
+    }
   } catch (err) {
     next(err);
   }

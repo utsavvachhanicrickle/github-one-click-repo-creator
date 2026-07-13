@@ -8,7 +8,10 @@ import {
   createBranch,
   compareUpload,
   commitUpload,
-  renameRemoteFlutterApp
+  renameRemoteFlutterApp,
+  getForkFamilies,
+  compareForkBranch,
+  mergeForkBranch
 } from '../controllers/github.controller.js';
 
 const router = express.Router();
@@ -20,6 +23,10 @@ const upload = multer({
 });
 
 router.post('/create-website-repo', requireGithubLogin, createWebsiteRepo);
+router.get('/user-repositories', requireGithubLogin, getUserRepos);
+router.get('/fork-families', requireGithubLogin, getForkFamilies);
+router.get('/fork-families/compare', requireGithubLogin, compareForkBranch);
+router.post('/fork-families/merge', requireGithubLogin, mergeForkBranch);
 
 // Active repo detail & commit workflow routes
 router.get('/repos', requireGithubLogin, getUserRepos);

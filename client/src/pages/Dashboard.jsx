@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Loader2, Search, AlertCircle, FolderGit2, Plus, Rocket, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2, Search, AlertCircle, FolderGit2, Plus, Rocket, X, GitFork, CheckCircle, ArrowUpCircle, ArrowDownCircle, AlertTriangle } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import RepoCard from '../components/RepoCard.jsx';
-import { getMyRepos } from '../api/githubApi.js';
+import { getMyRepos, getForkFamilies } from '../api/githubApi.js';
 import { createRepo } from '../store/slices/repoSlice.js';
 
 function normalizeRepoName(value) {
@@ -15,11 +16,63 @@ function normalizeRepoName(value) {
     .replace(/-+/g, '-');
 }
 
+function ForkFamilyCard({ family }) {
+  const navigate = useNavigate();
+  const { parent, summary } = family;
+
+  return (
+    <div
+      onClick={() => navigate(`/dashboard/fork-families/${parent.owner}/${parent.repo}`)}
+      className="bg-(--bg-primary) border border-(--border) rounded-3xl p-6 shadow-xs hover:border-(--primary) hover:shadow-md hover:scale-[1.01] transition-all duration-300 cursor-pointer select-none group relative overflow-hidden text-left"
+    >
+      <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.01] transition-opacity duration-300 pointer-events-none" />
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="space-y-1">
+          <span className="text-[10px] uppercase font-black text-(--primary) tracking-wider flex items-center gap-1">
+            <GitFork size={10} />
+            Fork Family Group
+          </span>
+          <h3 className="text-lg font-black text-(--text-primary) group-hover:text-(--primary) transition duration-200 truncate max-w-[280px]">
+            {parent.fullName}
+          </h3>
+          <p className="text-[10px] text-(--text-secondary) font-mono">
+            Default Branch: <span className="font-bold text-(--text-primary)">{parent.defaultBranch}</span>
+          </p>
+        </div>
+        <div className="px-2.5 py-1 rounded-full bg-(--primary)/10 text-(--primary) text-[11px] font-black shrink-0">
+          {summary.totalForks} {summary.totalForks === 1 ? 'Fork' : 'Forks'}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-(--border)/60 text-xs">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <span className="font-bold">Same</span>
+          <span className="font-black text-sm">{summary.same}</span>
+        </div>
+        <div className="flex items-center justify-between p-2 rounded-xl bg-(--primary)/5 border border-(--primary)/10 text-(--primary)">
+          <span className="font-bold">Ahead</span>
+          <span className="font-black text-sm">{summary.ahead}</span>
+        </div>
+        <div className="flex items-center justify-between p-2 rounded-xl bg-amber-500/5 border border-amber-500/10 text-amber-600 dark:text-amber-400">
+          <span className="font-bold">Behind</span>
+          <span className="font-black text-sm">{summary.behind}</span>
+        </div>
+        <div className="flex items-center justify-between p-2 rounded-xl bg-rose-500/5 border border-rose-500/10 text-rose-500">
+          <span className="font-bold">Diverged</span>
+          <span className="font-black text-sm">{summary.diverged}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { me } = useSelector((state) => state.auth);
 
   const [repos, setRepos] = useState([]);
+  const [forkFamilies, setForkFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,10 +93,16 @@ export default function Dashboard() {
     try {
       setLoading(true);
       setError('');
-      const data = await getMyRepos();
-      setRepos(data);
+      
+      const [reposData, forksData] = await Promise.all([
+        getMyRepos(),
+        getForkFamilies()
+      ]);
+      
+      setRepos(reposData || []);
+      setForkFamilies(forksData || []);
     } catch (err) {
-      setError(err.message || 'Failed to fetch repositories from GitHub.');
+      setError(err.message || 'Failed to fetch dashboard data from GitHub.');
     } finally {
       setLoading(false);
     }
@@ -84,9 +143,27 @@ export default function Dashboard() {
     }
   };
 
-  const filteredRepos = repos.filter((repo) =>
-    repo.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const forkRepoNames = useMemo(() => {
+    return new Set(
+      forkFamilies.flatMap((family) => family.forks.map((f) => `${f.owner}/${f.repo}`))
+    );
+  }, [forkFamilies]);
+
+  const normalRepos = useMemo(() => {
+    return repos.filter((r) => !forkRepoNames.has(`${r.owner}/${r.name}`));
+  }, [repos, forkRepoNames]);
+
+  const filteredNormalRepos = useMemo(() => {
+    return normalRepos.filter((repo) =>
+      repo.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [normalRepos, searchQuery]);
+
+  const filteredForkFamilies = useMemo(() => {
+    return forkFamilies.filter((family) =>
+      family.parent.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [forkFamilies, searchQuery]);
 
   return (
     <div className="w-full min-h-screen bg-(--bg) pb-12">
@@ -143,11 +220,37 @@ export default function Dashboard() {
               <p className="text-xs mt-1 leading-relaxed">{error}</p>
             </div>
           </div>
-        ) : filteredRepos.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {filteredRepos.map((repo) => (
-              <RepoCard key={`${repo.owner}/${repo.name}`} repo={repo} />
-            ))}
+        ) : (filteredNormalRepos.length > 0 || filteredForkFamilies.length > 0) ? (
+          <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Fork Families Section */}
+            {filteredForkFamilies.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-(--border)/60">
+                  <GitFork size={20} className="text-(--primary)" />
+                  <h3 className="text-xl font-black text-(--text-primary) tracking-tight">Fork Families</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredForkFamilies.map((family) => (
+                    <ForkFamilyCard key={family.parent.fullName} family={family} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Independent Repositories Section */}
+            {filteredNormalRepos.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-(--border)/60">
+                  <FolderGit2 size={20} className="text-(--primary)" />
+                  <h3 className="text-xl font-black text-(--text-primary) tracking-tight">Independent Repositories</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredNormalRepos.map((repo) => (
+                    <RepoCard key={`${repo.owner}/${repo.name}`} repo={repo} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="border-2 border-dashed border-(--border) rounded-3xl p-16 text-center text-(--text-secondary) bg-(--bg-primary)/40 select-none">
