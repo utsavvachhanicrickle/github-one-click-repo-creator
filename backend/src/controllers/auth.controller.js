@@ -88,14 +88,20 @@ export async function githubCallback(req, res, next) {
 }
 
 export function getMe(req, res) {
-  if (!req.session.githubAccessToken || !req.session.githubUser) {
-    return res.status(401).json({ authenticated: false });
+  const user = req.user;
+  if (user) {
+    return res.json({
+      authenticated: true,
+      user: {
+        email: user.email,
+        name: user.name,
+        unique_id: user.unique_id,
+        role: user.role,
+        user_verified: user.user_verified,
+      },
+    });
   }
-
-  res.json({
-    authenticated: true,
-    user: req.session.githubUser,
-  });
+  return res.status(404).json({ authenticated: false, message: MESSAGE.USER_NOT_FOUND });
 }
 
 export function logoutUser(req, res) {

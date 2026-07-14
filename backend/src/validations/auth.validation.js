@@ -9,6 +9,16 @@ const authValidations = {
       throw new AppError(MESSAGE.DATA_NOT_EXISTES, 400);
     }
   },
+  decodedRefreshValidation:(decodedRefresh)=>{
+    if(!decodedRefresh){
+      throw new AppError(MESSAGE.INVALID_REFRESH_TOKEN,403);
+    }
+  },
+  refreshToken: (refresh_token) => {
+    if (!refresh_token) {
+      throw new AppError(MESSAGE.REFRESH_TOKEN_EXPIRED, 401);
+    }
+  },
   valideEmail: (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
