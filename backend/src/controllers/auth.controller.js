@@ -1,11 +1,15 @@
-import crypto from 'crypto';
-import axios from 'axios';
-import { Octokit } from '@octokit/rest';
-import { config } from '../config.js';
-import { User } from '../models/User.js';
+import crypto from "crypto";
+import axios from "axios";
+import { Octokit } from "@octokit/rest";
+import { config } from "../config.js";
+import { User } from "../models/user.module.js";
+import { loginService, registerUserService } from "../services/auth.service.js";
+import { MESSAGE } from "../utils/message.js";
+import { setCookies } from "../utils/cookies.js";
+import { COOKIESSCHEMA } from "../utils/schema.js";
 
 export function githubLogin(req, res) {
-  const state = crypto.randomBytes(24).toString('hex');
+  const state = crypto.randomBytes(24).toString("hex");
   req.session.githubOAuthState = state;
 
   const params = new URLSearchParams({
@@ -13,7 +17,7 @@ export function githubLogin(req, res) {
     redirect_uri: config.github.callbackUrl,
     scope: config.github.scopes,
     state,
-    allow_signup: 'true'
+    allow_signup: "true",
   });
 
   res.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`);
@@ -32,18 +36,18 @@ export async function githubCallback(req, res, next) {
     }
 
     const tokenResponse = await axios.post(
-      'https://github.com/login/oauth/access_token',
+      "https://github.com/login/oauth/access_token",
       {
         client_id: config.github.clientId,
         client_secret: config.github.clientSecret,
         code,
-        redirect_uri: config.github.callbackUrl
+        redirect_uri: config.github.callbackUrl,
       },
       {
         headers: {
-          Accept: 'application/json'
-        }
-      }
+          Accept: "application/json",
+        },
+      },
     );
 
     const accessToken = tokenResponse.data?.access_token;
@@ -61,11 +65,10 @@ export async function githubCallback(req, res, next) {
         login: user.login,
         avatarUrl: user.avatar_url,
         htmlUrl: user.html_url,
-        name: user.name
+        name: user.name,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
-
 
     req.session.githubAccessToken = accessToken;
     req.session.githubUser = {
@@ -73,7 +76,7 @@ export async function githubCallback(req, res, next) {
       login: user.login,
       avatar_url: user.avatar_url,
       html_url: user.html_url,
-      name: user.name
+      name: user.name,
     };
 
     delete req.session.githubOAuthState;
@@ -91,13 +94,64 @@ export function getMe(req, res) {
 
   res.json({
     authenticated: true,
-    user: req.session.githubUser
+    user: req.session.githubUser,
   });
 }
 
 export function logoutUser(req, res) {
   req.session.destroy(() => {
-    res.clearCookie('repo_creator_sid');
+    res.clearCookie("repo_creator_sid");
     res.json({ ok: true });
   });
+}
+
+export async function loginController(req, res) {
+  try {
+    const { email, password } = req.body;
+
+    const result = await loginService(email, password);
+
+    setCookies({
+      type: COOKIESSCHEMA.ACCESS_TOKEN,
+      token: result.access_token,
+      maxAge: COOKIESSCHEMA.MAXAGE.ACCESS_TOKEN,
+      res,
+    });
+    setCookies({
+      type: COOKIESSCHEMA.REFRESH_TOKEN,
+      token: result.refresh_token,
+      maxAge: COOKIESSCHEMA.MAXAGE.REFRESH_TOKEN,
+      res,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: MESSAGE.LOGIN_SUCCESS,
+      user: result.user,
+    });
+  } catch (error) {
+    console.error("[Login] failed:", error);
+    return res.status(error.statusCode || 500).json({
+      error: error.message || MESSAGE.SOMETHING_WRONG,
+    });
+  }
+}
+
+export async function registerUserController(req, res) {
+  try {
+    const { email, password, name } = req.body;
+
+    const result = await registerUserService({ email, password, name });
+
+    return res.status(200).json({
+      success: true,
+      message: MESSAGE.REGISTER_SUCCESS,
+      user: result.user,
+    });
+  } catch (error) {
+    console.error("[Register] failed:", error);
+    return res.status(error.statusCode || 500).json({
+      error: error.message || MESSAGE.SOMETHING_WRONG,
+    });
+  }
 }

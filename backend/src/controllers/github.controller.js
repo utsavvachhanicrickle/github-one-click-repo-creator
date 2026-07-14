@@ -3,7 +3,7 @@ import { Octokit } from '@octokit/rest';
 import crypto from 'crypto';
 import { createStarterWebsiteFiles } from '../services/starterTemplate.service.js';
 import { createRepoWithFiles } from '../services/githubRepo.service.js';
-import { User } from '../models/User.js';
+import { User } from '../models/user.module.js';
 
 const createWebsiteSchema = z.object({
   repoName: z

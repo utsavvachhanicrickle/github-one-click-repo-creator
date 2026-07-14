@@ -11,6 +11,7 @@ for (const key of required) {
 
 export const config = {
   port: Number(process.env.PORT || 4000),
+  nodeEnv: process.env.NODE_ENV || 'development',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   backendUrl: process.env.BACKEND_URL || 'http://localhost:4000',
   github: {
@@ -20,6 +21,16 @@ export const config = {
     scopes: process.env.GITHUB_OAUTH_SCOPES || 'repo read:user user:email'
   },
   sessionSecret: process.env.SESSION_SECRET || 'dev-only-change-this',
+  bcryptSalt: Number(process.env.BCRYPT || 10),
+  jwtSecret: process.env.JWT_SECRET || 'jwt-access-secret',
+  refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET || 'jwt-refresh-secret',
+  smtp: {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || process.env.EMAIL_ID || '',
+    pass: process.env.SMTP_PASS || process.env.EMAIL_SCRETE || ''
+  },
   n8n: {
     getRepositoriesWebhookUrl: process.env.N8N_GET_REPOSITORIES_WEBHOOK_URL || ''
   }
