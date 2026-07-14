@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, Search, AlertCircle, FolderGit2, Plus, Rocket, X, GitFork, CheckCircle, ArrowUpCircle, ArrowDownCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Search, AlertCircle, FolderGit2, Plus, Rocket, X, GitFork } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import RepoCard from '../components/RepoCard.jsx';
-import { getMyRepos, getForkFamilies } from '../services/github.service.js';
+import { getMyRepos } from '../services/github.service.js';
 import { createRepo } from '../store/slices/repoSlice.js';
 import ForkFamilyCard from "../components/ForkFamilyCard.jsx"
+import { getForkFamilies } from '../services/github.service.js'
 
 function normalizeRepoName(value) {
   return value
@@ -20,7 +20,6 @@ function normalizeRepoName(value) {
 
 export default function Dashboard() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { me } = useSelector((state) => state.auth);
 
   const [repos, setRepos] = useState([]);

@@ -1,6 +1,6 @@
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { Github, Rocket, FolderGit2, GitBranch, RefreshCw, Zap, ShieldCheck } from 'lucide-react';
+import { Github, Rocket, FolderGit2, RefreshCw, Zap, ShieldCheck } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import { loginWithGitHub } from '../services/auth.service.js';
 

@@ -1,7 +1,7 @@
 import API from './apiClient.js';
 
 export function loginWithGitHub() {
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   window.location.href = `${API_BASE_URL}/api/auth/github`;
 }
 
