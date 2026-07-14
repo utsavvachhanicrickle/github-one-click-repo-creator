@@ -37,6 +37,11 @@ const authValidations = {
       throw new AppError(MESSAGE.PASSWORD_NOT_MATCH, 401);
     }
   },
+  verifyUser: ({ user }) => {
+    if (!user.user_verified) {
+      throw new AppError(MESSAGE.USER_NOT_VERIFIED, 401);
+    }
+  },
 };
 
 export default authValidations;

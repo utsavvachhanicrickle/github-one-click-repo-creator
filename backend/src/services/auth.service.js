@@ -17,6 +17,10 @@ export async function loginService(email, password) {
   const isPasswordValid = await comparePassword(password, user.password);
   authValidations.passwordNotMatch({ isPasswordValid });
 
+  authValidations.verifyUser({ user });
+
+  await User.updateLastLogin(user.id);
+
   const access_token = await genrateAccessToken({
     email,
     id: user._id,
