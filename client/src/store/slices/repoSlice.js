@@ -1,20 +1,20 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getMyRepositories, getUserRepositories, createWebsiteRepo } from '../../services/api.js';
+import { getUserRepositories, createWebsiteRepo, getForkFamilies } from '../../services/github.service.js';
 import { showToast } from './toastSlice.js';
 
-export const fetchHistory = createAsyncThunk('repos/fetchHistory', async (_, { rejectWithValue }) => {
+export const fetchGitHubRepos = createAsyncThunk('repos/fetchGitHubRepos', async (_, { rejectWithValue }) => {
   try {
-    const repos = await getMyRepositories();
+    const repos = await getUserRepositories();
     return repos;
   } catch (error) {
     return rejectWithValue(error.message);
   }
 });
 
-export const fetchGitHubRepos = createAsyncThunk('repos/fetchGitHubRepos', async (_, { rejectWithValue }) => {
+export const fetchForkFamilies = createAsyncThunk('repos/fetchForkFamilies', async (_, { rejectWithValue }) => {
   try {
-    const repos = await getUserRepositories();
-    return repos;
+    const families = await getForkFamilies();
+    return families;
   } catch (error) {
     return rejectWithValue(error.message);
   }
@@ -28,8 +28,8 @@ export const createRepo = createAsyncThunk(
       // Dispatch success toast
       dispatch(showToast({ message: `Repository "${payload.repoName}" created successfully!`, type: 'success' }));
       // Refresh lists
-      dispatch(fetchHistory());
       dispatch(fetchGitHubRepos());
+      dispatch(fetchForkFamilies());
       return data.repo;
     } catch (error) {
       dispatch(showToast({ message: error.message || 'Failed to create repository', type: 'error' }));
@@ -39,9 +39,8 @@ export const createRepo = createAsyncThunk(
 );
 
 const initialState = {
-  historyRepos: [],
-  historyLoading: false,
   allGitHubRepos: [],
+  forkFamilies: [],
   gitHubLoading: false,
   creating: false,
   createdRepo: null,
@@ -59,7 +58,6 @@ const repoSlice = createSlice({
       state.error = null;
     },
     clearRepoState: (state) => {
-      state.historyRepos = [];
       state.allGitHubRepos = [];
       state.createdRepo = null;
       state.error = null;
@@ -67,17 +65,6 @@ const repoSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // fetchHistory
-      .addCase(fetchHistory.pending, (state) => {
-        state.historyLoading = true;
-      })
-      .addCase(fetchHistory.fulfilled, (state, action) => {
-        state.historyLoading = false;
-        state.historyRepos = action.payload;
-      })
-      .addCase(fetchHistory.rejected, (state) => {
-        state.historyLoading = false;
-      })
       // fetchGitHubRepos
       .addCase(fetchGitHubRepos.pending, (state) => {
         state.gitHubLoading = true;
@@ -88,6 +75,10 @@ const repoSlice = createSlice({
       })
       .addCase(fetchGitHubRepos.rejected, (state) => {
         state.gitHubLoading = false;
+      })
+      // fetchForkFamilies
+      .addCase(fetchForkFamilies.fulfilled, (state, action) => {
+        state.forkFamilies = action.payload || [];
       })
       // createRepo
       .addCase(createRepo.pending, (state) => {

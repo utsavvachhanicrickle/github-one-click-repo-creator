@@ -4,8 +4,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { fetchMe } from './store/slices/authSlice.js';
 import { Loader2 } from 'lucide-react';
 
-import Login from './pages/Login.jsx';
+import Home from './pages/Home.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import RepoDetail from './pages/RepoDetail.jsx';
+import ForkFamilyDetail from './pages/ForkFamilyDetail.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import PublicRoute from './components/PublicRoute.jsx';
 import Toast from './components/Toast.jsx';
@@ -33,12 +35,16 @@ export default function App() {
 
       <Routes>
         <Route
-          path="/login"
+          path="/"
           element={
             <PublicRoute>
-              <Login />
+              <Home />
             </PublicRoute>
           }
+        />
+        <Route
+          path="/login"
+          element={<Navigate to="/" replace />}
         />
         <Route
           path="/dashboard"
@@ -48,7 +54,23 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<Navigate to={me ? "/dashboard" : "/login"} replace />} />
+        <Route
+          path="/dashboard/fork-families/:parentOwner/:parentRepo"
+          element={
+            <ProtectedRoute>
+              <ForkFamilyDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/repos/:owner/:repo"
+          element={
+            <ProtectedRoute>
+              <RepoDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to={me ? "/dashboard" : "/"} replace />} />
       </Routes>
     </main>
   );

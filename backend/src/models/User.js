@@ -1,28 +1,31 @@
-import mongoose from 'mongoose';
+import { pool } from '../db.js';
 
-const userSchema = new mongoose.Schema({
-  githubId: {
-    type: Number,
-    required: true,
-    unique: true
-  },
-  login: {
-    type: String,
-    required: true
-  },
-  avatarUrl: {
-    type: String
-  },
-  htmlUrl: {
-    type: String
-  },
-  name: {
-    type: String
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+export const User = {
+  findOneAndUpdate: async (query, update) => {
+    const sql = `
+      INSERT INTO users (github_id, login, avatar_url, html_url, name)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (github_id)
+      DO UPDATE SET
+        login = EXCLUDED.login,
+        avatar_url = EXCLUDED.avatar_url,
+        html_url = EXCLUDED.html_url,
+        name = EXCLUDED.name
+      RETURNING *;
+    `;
+    const values = [
+      query.githubId,
+      update.login,
+      update.avatarUrl,
+      update.htmlUrl,
+      update.name
+    ];
+    try {
+      const res = await pool.query(sql, values);
+      return res.rows[0];
+    } catch (err) {
+      console.error('[database] PostgreSQL User Upsert Error:', err.message);
+      throw err;
+    }
   }
-});
-
-export const User = mongoose.model('User', userSchema);
+};
