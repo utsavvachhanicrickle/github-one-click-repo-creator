@@ -15,11 +15,11 @@ export async function authenticateUser(req, res, next) {
     const refresh_token = req.cookies[COOKIESSCHEMA.REFRESH_TOKEN];
     authValidations.refreshToken(refresh_token);
 
-    const decodedRefresh = verifyRefreshToken(refresh_token);
+    const decodedRefresh = await verifyRefreshToken(refresh_token);
     authValidations.decodedRefreshValidation(decodedRefresh);
 
     const user = await User.findUserByEmail({ email: decodedRefresh.email });
-    authValidations.userNotFound(user);
+    authValidations.userNotFound({ user });
 
     req.user = user;
     next();
