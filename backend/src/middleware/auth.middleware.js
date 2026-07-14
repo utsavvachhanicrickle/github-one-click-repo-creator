@@ -28,3 +28,15 @@ export async function authenticateUser(req, res, next) {
     return res.status(401).json({ authenticated: false, message: error.message });
   }
 }
+
+
+export async function authenticateAdminUser(req, res, next) {
+  try {
+    authValidations.isAdminUser({ user: req.user });
+    next();
+  } catch (error) {
+    console.error('[authMiddleware-admin] error:', error);
+    return res.status(403).json({ authenticated: false, message: error.message });
+  }
+}
+

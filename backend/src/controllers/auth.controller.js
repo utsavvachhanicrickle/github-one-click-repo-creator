@@ -3,7 +3,12 @@ import axios from "axios";
 import { Octokit } from "@octokit/rest";
 import { config } from "../config.js";
 import { User } from "../models/user.module.js";
-import { loginService, registerUserService } from "../services/auth.service.js";
+import {
+  loginService,
+  registerUserService,
+  registerPersonalUserService,
+  adminPersonalUserRelationService,
+} from "../services/auth.service.js";
 import { MESSAGE } from "../utils/message.js";
 import { setCookies } from "../utils/cookies.js";
 import { COOKIESSCHEMA } from "../utils/schema.js";
@@ -101,7 +106,9 @@ export function getMe(req, res) {
       },
     });
   }
-  return res.status(404).json({ authenticated: false, message: MESSAGE.USER_NOT_FOUND });
+  return res
+    .status(404)
+    .json({ authenticated: false, message: MESSAGE.USER_NOT_FOUND });
 }
 
 export function logoutUser(req, res) {
@@ -156,6 +163,49 @@ export async function registerUserController(req, res) {
     });
   } catch (error) {
     console.error("[Register] failed:", error);
+    return res.status(error.statusCode || 500).json({
+      error: error.message || MESSAGE.SOMETHING_WRONG,
+    });
+  }
+}
+
+export async function registerPersonalUserController(req, res) {
+  try {
+    const { email, password, name } = req.body;
+    const user = req.user;
+    const result = await registerPersonalUserService({
+      email,
+      password,
+      name,
+      organization_id: user.id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: MESSAGE.REGISTER_SUCCESS,
+      relations: result.relations,
+    });
+  } catch (error) {
+    console.error("[Register Personal User] failed:", error);
+    return res.status(error.statusCode || 500).json({
+      error: error.message || MESSAGE.SOMETHING_WRONG,
+    });
+  }
+}
+
+export async function adminPersonalUserRelationController(req, res) {
+  try {
+    const user = req.user;
+    const result = await adminPersonalUserRelationService({
+      admin_id: user.id,
+    });
+    return res.status(200).json({
+      success: true,
+      message: MESSAGE.REGISTER_SUCCESS,
+      relations: result.relations,
+    });
+  } catch (error) {
+    console.error("[Admin Personal User Relation] failed:", error);
     return res.status(error.statusCode || 500).json({
       error: error.message || MESSAGE.SOMETHING_WRONG,
     });

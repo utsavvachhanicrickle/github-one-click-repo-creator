@@ -1,4 +1,5 @@
 export const MESSAGE = {
+  ADMIN_ACCESS_REQUIRED: "Admin access required",
   EMAIL_ALREADY_EXISTS: "Email already exists",
   EMAIL_NOT_FOUND: "Email not found",
   EMAIL_REQUIRED: "Email is required",

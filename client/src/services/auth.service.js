@@ -28,3 +28,13 @@ export async function registerWithEmailAndPassword(email, password, name) {
   const res = await API.post('/api/auth/register-user', { email, password, name });
   return res.data;
 }
+
+export async function registerPersonalUser(email, password, name) {
+  const res = await API.post('/api/auth/register-personal-user', { email, password, name });
+  return res.data;
+}
+
+export async function getAdminPersonalUserRelations() {
+  const res = await API.get('/api/auth/admin-personal-user-relation');
+  return res.data;
+}

@@ -41,6 +41,19 @@ export const User = {
       throw error;
     }
   },
+  findUserById: async ({ uniqueIds }) => {
+    const query = `SELECT * FROM users WHERE unique_id = ANY($1)`;
+    try {
+      const result = await pool.query(query, [uniqueIds]);
+      if (result.rows.length > 0) {
+        return result.rows;
+      }
+      return [];
+    } catch (error) {
+      console.error("[database] PostgreSQL findUserById Error:", error);
+      throw error;
+    }
+  },
   createUser: async ({ unique_id, email, password, name, role = 'personal', user_verified = false, user_verfied }) => {
     const verified = user_verified || user_verfied || false;
     const sql = `
@@ -69,6 +82,34 @@ export const User = {
       return res.rows[0];
     } catch (err) {
       console.error('[database] PostgreSQL updateLastLogin Error:', err.message);
+      throw err;
+    }
+  },
+  addAdminPersonalRelation: async ({ adminid, personalid }) => {
+    const sql = `
+      INSERT INTO adminpersonalrelation (adminid, personalid)
+      VALUES ($1, $2)
+      RETURNING *;
+    `;
+    const values = [adminid, personalid];
+    try {
+      const res = await pool.query(sql, values);
+      return res.rows[0];
+    } catch (err) {
+      console.error('[database] PostgreSQL addAdminPersonalRelation Error:', err.message);
+      throw err;
+    }
+  },
+  getAdminPersonalUserByAdminId: async ({admin_id}) => {
+    const sql = `
+      SELECT id, personalid FROM adminpersonalrelation WHERE adminid = $1
+    `;
+    const values = [admin_id];
+    try {
+      const res = await pool.query(sql, values);
+      return res.rows;
+    } catch (err) {
+      console.error('[database] PostgreSQL getAdminPersonalUserByAdminId Error:', err.message);
       throw err;
     }
   },

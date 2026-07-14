@@ -1,13 +1,21 @@
-import { useState, useContext } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { Sun, Moon, LogOut, Github, Menu, Mail, FolderGit2 } from 'lucide-react';
-import { logoutUser } from '../../../store/slices/authSlice.js';
-import { clearRepoState } from '../../../store/slices/repoSlice.js';
-import { DarkModeContext } from '../../../context/darkModeContext.jsx';
-import Logo from '../../../components/Logo.jsx';
-import { loginWithGitHub } from '../../../services/auth.service.js';
-import toast from '../../../utils/Toast.js';
+import { useState, useContext } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import {
+  Sun,
+  Moon,
+  LogOut,
+  Github,
+  Menu,
+  Mail,
+  FolderGit2,
+} from "lucide-react";
+import { logoutUser } from "../../../store/slices/authSlice.js";
+import { clearRepoState } from "../../../store/slices/repoSlice.js";
+import { DarkModeContext } from "../../../context/darkModeContext.jsx";
+import Logo from "../../../components/Logo.jsx";
+import { loginWithGitHub } from "../../../services/auth.service.js";
+import toast from "../../../utils/Toast.js";
 
 export default function PersonalNavbar({ onToggleSidebar }) {
   const dispatch = useDispatch();
@@ -20,18 +28,23 @@ export default function PersonalNavbar({ onToggleSidebar }) {
     try {
       await dispatch(logoutUser()).unwrap();
       dispatch(clearRepoState());
-      toast.success('Logged out successfully');
-      navigate('/login');
+      toast.success("Logged out successfully");
+      navigate("/login");
     } catch (err) {
-      toast.error(err || 'Failed to logout');
+      toast.error(err || "Failed to logout");
     }
   };
 
   if (!me) return null;
 
   const initials = me.name
-    ? me.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : '?';
+    ? me.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?";
 
   return (
     <>
@@ -44,8 +57,7 @@ export default function PersonalNavbar({ onToggleSidebar }) {
       )}
 
       <header className="sticky top-0 z-50 w-full bg-(--bg-primary)/85 backdrop-blur-md border-b border-(--border)/60 transition-all duration-300 select-none h-18">
-        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-          
+        <div className="mx-auto px-6 h-full flex items-center justify-between">
           {/* Left: Hamburger & Logo */}
           <div className="flex items-center gap-3">
             <button
@@ -55,7 +67,9 @@ export default function PersonalNavbar({ onToggleSidebar }) {
             >
               <Menu size={18} />
             </button>
-            <Logo />
+            <div className="sm:block hidden">
+              <Logo />
+            </div>
           </div>
 
           {/* Right: Dark Mode Toggle, GitHub Link status & User profile Dropdown */}
@@ -125,7 +139,11 @@ export default function PersonalNavbar({ onToggleSidebar }) {
                     {me.login ? (
                       <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
                         {me.avatar_url && (
-                          <img src={me.avatar_url} alt={me.login} className="w-5 h-5 rounded-full ring-1 ring-emerald-500/20" />
+                          <img
+                            src={me.avatar_url}
+                            alt={me.login}
+                            className="w-5 h-5 rounded-full ring-1 ring-emerald-500/20"
+                          />
                         )}
                         <span className="truncate">Linked: @{me.login}</span>
                       </div>
@@ -140,12 +158,18 @@ export default function PersonalNavbar({ onToggleSidebar }) {
                     )}
 
                     <div className="flex items-center gap-2 text-xs font-bold text-(--text-secondary) px-1">
-                      <Mail size={14} className="shrink-0 text-(--text-secondary)" />
+                      <Mail
+                        size={14}
+                        className="shrink-0 text-(--text-secondary)"
+                      />
                       <span className="truncate">{me.email}</span>
                     </div>
 
                     <div className="flex items-center gap-2 text-xs font-bold text-(--text-secondary) px-1">
-                      <FolderGit2 size={14} className="shrink-0 text-(--primary)" />
+                      <FolderGit2
+                        size={14}
+                        className="shrink-0 text-(--primary)"
+                      />
                       <span className="capitalize font-black text-(--primary)">
                         Role: {me.role}
                       </span>
@@ -169,7 +193,6 @@ export default function PersonalNavbar({ onToggleSidebar }) {
               )}
             </div>
           </div>
-
         </div>
       </header>
     </>

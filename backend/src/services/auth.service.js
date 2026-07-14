@@ -80,3 +80,68 @@ export async function registerUserService({ email, password, name }) {
     },
   };
 }
+
+export async function registerPersonalUserService({
+  email,
+  password,
+  name,
+  organization_id,
+}) {
+  authValidations.notExistesData({ email, password });
+  authValidations.valideEmail(email);
+  authValidations.validePassword(password);
+
+  const userAlrady = await User.findUserByEmail({ email });
+  authValidations.userFound({ user: userAlrady });
+
+  const hashPassword = await createPassword(password);
+  const unique_id = Math.random().toString(36).substring(2, 10);
+
+  const user = await User.createUser({
+    unique_id,
+    email,
+    password: hashPassword,
+    name,
+    role: "personal",
+    user_verfied: true,
+  });
+
+  const org = await User.addAdminPersonalRelation({
+    adminid: organization_id,
+    personalid: user.id,
+  });
+
+  return {
+    relations: {
+      unique_id: user.unique_id,
+      user: {
+        name: user.name,
+        unique_id: user.unique_id,
+        email: user.email,
+      },
+      organization_id: org.id,
+    },
+  };
+}
+
+export async function adminPersonalUserRelationService({ admin_id }) {
+  const relations = await User.getAdminPersonalUserByAdminId({ admin_id });
+  const personalUsers = await User.findUserById({
+    uniqueIds: relations.map((relation) => relation.personalid),
+  });
+  const relationsRespo = personalUsers.map((personalUser) => {
+    const rel = relations.find((r) => r.personalid === personalUser.id);
+    return {
+      unique_id: personalUser.unique_id,
+      user: {
+        name: personalUser.name,
+        unique_id: personalUser.unique_id,
+        email: personalUser.email,
+      },
+      organization_id: rel ? rel.id : null,
+    };
+  });
+  return {
+    relations: relationsRespo,
+  };
+}

@@ -7,6 +7,11 @@ const authValidations = {
       throw new AppError(MESSAGE.INVALID_REFRESH_TOKEN, 403);
     }
   },
+  isAdminUser: ({ user }) => {
+    if (!user || user.role !== 'admin') {
+      throw new AppError(MESSAGE.ADMIN_ACCESS_REQUIRED, 403);
+    }
+  },
   notExistesData: (data) => {
     const { email, password } = data;
 
