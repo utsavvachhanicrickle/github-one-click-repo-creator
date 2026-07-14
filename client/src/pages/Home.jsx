@@ -36,20 +36,19 @@ export default function Home() {
         <div className="pt-4 flex flex-col sm:flex-row items-center gap-4 justify-center">
           {me ? (
             <Link
-              to="/dashboard"
+              to={me.role === 'admin' ? `/admin/${me.unique_id}` : `/id/${me.unique_id}`}
               className="inline-flex items-center justify-center gap-2 bg-(--primary) text-(--text-inverse) font-extrabold px-8 py-4.5 rounded-2xl hover:bg-(--primary-hover) transition duration-200 ease-in-out shadow-lg shadow-(--primary)/15 active:scale-95 cursor-pointer text-sm"
             >
               <Rocket size={18} />
               Go to Dashboard
             </Link>
           ) : (
-            <button
-              onClick={loginWithGitHub}
-              className="inline-flex items-center justify-center gap-2.5 bg-(--primary) text-(--text-inverse) font-extrabold px-8 py-4.5 rounded-2xl hover:bg-(--primary-hover) transition duration-200 ease-in-out shadow-lg shadow-(--primary)/15 active:scale-95 cursor-pointer text-sm"
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center gap-2 bg-(--primary) text-(--text-inverse) font-extrabold px-8 py-4.5 rounded-2xl hover:bg-(--primary-hover) transition duration-200 ease-in-out shadow-lg shadow-(--primary)/15 active:scale-95 cursor-pointer text-sm"
             >
-              <Github size={20} />
-              Login with GitHub
-            </button>
+              Get Started
+            </Link>
           )}
           <a
             href="https://github.com"

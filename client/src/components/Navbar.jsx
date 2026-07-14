@@ -1,11 +1,11 @@
 import { useContext } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import { Sun, Moon, LogOut, Github } from 'lucide-react';
 import { logoutUser } from '../store/slices/authSlice.js';
 import { clearRepoState } from '../store/slices/repoSlice.js';
 import { DarkModeContext } from '../context/darkModeContext.jsx';
 import Logo from './Logo.jsx';
-import { loginWithGitHub } from '../services/auth.service.js';
 
 export default function Navbar() {
   const dispatch = useDispatch();
@@ -33,25 +33,19 @@ export default function Navbar() {
           </button>
 
           {me ? (
-            <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-(--bg-secondary) border border-(--border) backdrop-blur-md">
-              <img src={me.avatar_url} alt={me.login} className="w-7 h-7 rounded-full ring-2 ring-(--primary)/30" />
-              <span className="text-sm font-semibold text-(--text-primary)">@{me.login}</span>
-              <button
-                className="p-1.5 rounded-full text-(--text-secondary) hover:text-(--danger) transition cursor-pointer"
-                onClick={handleLogoutClick}
-                title="Logout"
-              >
-                <LogOut size={16} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={loginWithGitHub}
+            <Link
+              to={me.role === 'admin' ? `/admin/${me.unique_id}` : `/id/${me.unique_id}`}
               className="inline-flex items-center gap-2 bg-linear-to-r from-(--primary) to-(--accent) text-white font-extrabold px-5 py-2.5 rounded-xl hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-xs cursor-pointer shadow-md shadow-(--primary)/15 select-none"
             >
-              <Github size={14} />
+              Go to Dashboard
+            </Link>
+          ) : (
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-2 bg-linear-to-r from-(--primary) to-(--accent) text-white font-extrabold px-5 py-2.5 rounded-xl hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-xs cursor-pointer shadow-md shadow-(--primary)/15 select-none"
+            >
               Get Started
-            </button>
+            </Link>
           )}
         </div>
       </div>

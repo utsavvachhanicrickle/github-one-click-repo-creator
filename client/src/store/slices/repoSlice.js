@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { getUserRepositories, createWebsiteRepo, getForkFamilies } from '../../services/github.service.js';
-import { showToast } from './toastSlice.js';
+import toast from '../../utils/Toast.js';
 
 export const fetchGitHubRepos = createAsyncThunk('repos/fetchGitHubRepos', async (_, { rejectWithValue }) => {
   try {
@@ -25,14 +25,14 @@ export const createRepo = createAsyncThunk(
   async (payload, { dispatch, rejectWithValue }) => {
     try {
       const data = await createWebsiteRepo(payload);
-      // Dispatch success toast
-      dispatch(showToast({ message: `Repository "${payload.repoName}" created successfully!`, type: 'success' }));
+      // Display success toast
+      toast.success(`Repository "${payload.repoName}" created successfully!`);
       // Refresh lists
       dispatch(fetchGitHubRepos());
       dispatch(fetchForkFamilies());
       return data.repo;
     } catch (error) {
-      dispatch(showToast({ message: error.message || 'Failed to create repository', type: 'error' }));
+      toast.error(error.message || 'Failed to create repository');
       return rejectWithValue(error.message);
     }
   }

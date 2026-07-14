@@ -13,7 +13,7 @@ export default function ForkFamilyCard({ family }) {
 
   return (
     <div
-      onClick={() => navigate(`/dashboard/fork-families/${parent.owner}/${parent.repo}`)}
+      onClick={() => navigate(`/id/${me?.unique_id}/fork-families/${parent.owner}/${parent.repo}`)}
       className="bg-(--bg-primary) border border-(--border) rounded-3xl p-6 shadow-xs hover:border-(--primary) hover:shadow-md hover:scale-[1.01] transition-all duration-300 cursor-pointer select-none group relative overflow-hidden text-left"
     >
       <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.01] transition-opacity duration-300 pointer-events-none" />

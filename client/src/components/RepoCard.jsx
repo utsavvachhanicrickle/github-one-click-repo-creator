@@ -1,11 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { FolderGit2, Calendar, GitFork, ArrowUpRight } from "lucide-react";
 
 export default function RepoCard({ repo, parent }) {
   const navigate = useNavigate();
+  const { me } = useSelector((state) => state.auth);
+  
   const linkTo = parent
-    ? `/dashboard/fork-families/${parent.owner}/${parent.repo}`
-    : `/dashboard/repos/${repo.owner}/${repo.name}`;
+    ? `/id/${me?.unique_id || 'dev'}/fork-families/${parent.owner}/${parent.repo}`
+    : `/id/${me?.unique_id || 'dev'}/repos/${repo.owner}/${repo.name}`;
 
   const handleCardClick = (e) => {
     // If the click is inside an interactive element, do not trigger card navigation
@@ -92,11 +95,7 @@ export default function RepoCard({ repo, parent }) {
         </div>
 
         <Link
-          to={
-            parent
-              ? `/dashboard/fork-families/${parent.owner}/${parent.repo}`
-              : `/dashboard/repos/${repo.owner}/${repo.name}`
-          }
+          to={linkTo}
           className="mt-6 w-full bg-(--bg-secondary) hover:bg-(--primary) text-(--text-primary) hover:text-(--text-inverse) font-bold py-3.5 rounded-xl border border-(--border) hover:border-transparent flex items-center justify-center gap-2 transition active:scale-[0.99] cursor-pointer shadow-xs select-none"
         >
           Open Repository

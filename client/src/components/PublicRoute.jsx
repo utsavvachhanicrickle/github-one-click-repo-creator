@@ -14,7 +14,11 @@ export default function PublicRoute({ children }) {
   }
 
   if (me) {
-    return <Navigate to="/dashboard" replace />;
+    if (me.role === 'admin') {
+      return <Navigate to={`/admin/${me.unique_id}`} replace />;
+    } else {
+      return <Navigate to={`/id/${me.unique_id}`} replace />;
+    }
   }
 
   return children;

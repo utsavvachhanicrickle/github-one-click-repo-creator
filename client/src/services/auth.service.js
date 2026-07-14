@@ -18,3 +18,13 @@ export async function logout() {
   const res = await API.post('/api/auth/logout');
   return res.data;
 }
+
+export async function loginWithEmailAndPassword(email, password) {
+  const res = await API.post('/api/auth/login', { email, password });
+  return res.data;
+}
+
+export async function registerWithEmailAndPassword(email, password, name) {
+  const res = await API.post('/api/auth/register-user', { email, password, name });
+  return res.data;
+}

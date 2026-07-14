@@ -1,3 +1,4 @@
+import toast from '../utils/Toast.js';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
 let isRefreshing = false;
@@ -14,10 +15,6 @@ const processQueue = (error = null) => {
 // Axios-like response interceptor wrapper around fetch
 async function request(url, options = {}) {
   let finalUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
-  if (options.method === 'GET' || !options.method) {
-    const separator = finalUrl.includes('?') ? '&' : '?';
-    finalUrl = `${finalUrl}${separator}_t=${Date.now()}`;
-  }
 
   const defaultHeaders = {
     'Accept': 'application/json',
@@ -59,11 +56,8 @@ async function request(url, options = {}) {
           // Clear session data and trigger Redux logout updates
           import('../store/index').then((m) => {
              m.store.dispatch({ type: 'auth/setAuthData', payload: null });
-             m.store.dispatch({
-               type: 'toast/showToast',
-               payload: { message: 'Session expired. Please log in again.', type: 'error' }
-             });
           });
+          toast.error('Session expired. Please log in again.');
           reject(err);
         } finally {
           isRefreshing = false;

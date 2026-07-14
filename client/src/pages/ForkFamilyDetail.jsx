@@ -333,12 +333,10 @@ export default function ForkFamilyDetail() {
 
   return (
     <div className="w-full min-h-screen bg-(--bg) pb-12">
-      <Navbar />
-
       <div className="max-w-7xl mx-auto px-6 mt-12 relative z-10">
         {/* Back navigation & Header */}
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(`/id/${me?.unique_id}`)}
           className="flex items-center gap-2 text-xs font-black text-(--text-secondary) hover:text-(--primary) transition mb-6 group select-none uppercase tracking-wider"
         >
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />

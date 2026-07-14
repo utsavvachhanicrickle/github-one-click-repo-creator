@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, Github, GitBranch, ShieldAlert, CheckCircle2, ExternalLink, Plus, X, Rocket } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
@@ -18,6 +19,7 @@ function getCleanRelativePath(file) {
 
 export default function RepoDetail() {
   const { owner, repo } = useParams();
+  const { me } = useSelector((state) => state.auth);
   
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('');
@@ -224,11 +226,9 @@ export default function RepoDetail() {
 
   return (
     <div className="w-full min-h-screen bg-(--bg) pb-12">
-      <Navbar />
-      
       <div className="max-w-5xl mx-auto px-6 mt-8">
         <Link
-          to="/dashboard"
+          to={`/id/${me?.unique_id}`}
           className="inline-flex items-center gap-2 text-xs font-bold text-(--text-secondary) hover:text-(--primary) transition duration-200 ease-in-out mb-6 select-none"
         >
           <ArrowLeft size={16} /> Back to Dashboard
