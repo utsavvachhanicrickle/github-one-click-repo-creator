@@ -8,6 +8,7 @@ import {
   registerUserController,
   registerPersonalUserController,
   adminPersonalUserRelationController,
+  refreshTokenController,
 } from "../controllers/auth.controller.js";
 import {
   authenticateUser,
@@ -18,6 +19,7 @@ const router = express.Router();
 
 router.get("/github", githubLogin);
 router.get("/github/callback", githubCallback);
+router.post("/refresh-token", refreshTokenController);
 router.get("/me", authenticateUser, getMe);
 router.post("/logout", logoutUser);
 

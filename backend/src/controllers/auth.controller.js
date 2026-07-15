@@ -12,6 +12,8 @@ import {
 import { MESSAGE } from "../utils/message.js";
 import { setCookies } from "../utils/cookies.js";
 import { COOKIESSCHEMA } from "../utils/schema.js";
+import { verifyRefreshToken, genrateAccessToken } from "../utils/token.js";
+import authValidations from "../validations/auth.validation.js";
 
 export function githubLogin(req, res) {
   const state = crypto.randomBytes(24).toString("hex");
@@ -209,5 +211,36 @@ export async function adminPersonalUserRelationController(req, res) {
     return res.status(error.statusCode || 500).json({
       error: error.message || MESSAGE.SOMETHING_WRONG,
     });
+  }
+}
+
+export async function refreshTokenController(req, res) {
+  try {
+    const refresh_token = req.cookies[COOKIESSCHEMA.REFRESH_TOKEN];
+    authValidations.refreshToken(refresh_token)
+
+    const decoded = await verifyRefreshToken(refresh_token);
+    authValidations.decodedRefreshValidation(decoded)
+    const user = await User.findUserByEmail({ email: decoded.email });
+    authValidations.userNotFound({ user });
+    
+    // Generate new access token
+    const new_access_token = await genrateAccessToken({
+      email: decoded.email,
+      id: decoded.id,
+    });
+
+    // Set new access token cookie
+    await setCookies({
+      type: COOKIESSCHEMA.ACCESS_TOKEN,
+      token: new_access_token,
+      maxAge: COOKIESSCHEMA.MAXAGE.ACCESS_TOKEN,
+      res,
+    });
+
+    return res.status(200).json({ success: true, message: "Token refreshed successfully" });
+  } catch (error) {
+    console.error("[Refresh Token Error]:", error.message);
+    return res.status(401).json({ success: false, message: "Invalid or expired refresh token" });
   }
 }

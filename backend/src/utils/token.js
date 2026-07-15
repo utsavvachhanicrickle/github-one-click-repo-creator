@@ -20,3 +20,11 @@ export const verifyRefreshToken = async (refreshToken) => {
     throw new Error(MESSAGE.REFRESH_TOKEN_EXPIRED);
   }
 };
+
+export const verifyAccessToken = async (accessToken) => {
+  try {
+    return jwt.verify(accessToken, config.jwtSecret);
+  } catch (err) {
+    throw new Error("Access token expired");
+  }
+};

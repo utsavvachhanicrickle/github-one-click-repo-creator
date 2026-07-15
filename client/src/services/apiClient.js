@@ -31,7 +31,7 @@ async function request(url, options = {}) {
   try {
     const res = await fetch(finalUrl, fetchOptions);
 
-    if (res.status === 401 && !options._retry && !url.includes('/api/auth/me')) {
+    if (res.status === 401 && !options._retry && !url.includes('/api/auth/refresh-token')) {
       options._retry = true;
 
       if (isRefreshing) {
@@ -47,7 +47,13 @@ async function request(url, options = {}) {
 
       return new Promise(async (resolve, reject) => {
         try {
-          await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: 'include' });
+          const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, { 
+            method: 'POST',
+            credentials: 'include' 
+          });
+          if (!refreshRes.ok) {
+            throw new Error('Refresh token invalid or expired');
+          }
           processQueue();
           resolve(request(url, options));
         } catch (err) {

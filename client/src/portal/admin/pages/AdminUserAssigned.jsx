@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Users,
@@ -29,6 +29,8 @@ export default function AdminUserAssigned() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const hasLoadedRef = useRef(false);
+
   const loadRelations = () => {
     dispatch(fetchAdminRelations())
       .unwrap()
@@ -36,7 +38,10 @@ export default function AdminUserAssigned() {
   };
 
   useEffect(() => {
-    loadRelations();
+    if (!hasLoadedRef.current) {
+      loadRelations();
+      hasLoadedRef.current = true;
+    }
   }, []);
 
   const handleSubmit = async (e) => {

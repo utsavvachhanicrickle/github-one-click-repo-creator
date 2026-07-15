@@ -2,8 +2,8 @@ export const COOKIESSCHEMA = {
   ACCESS_TOKEN: "accessToken",
   REFRESH_TOKEN: "refreshToken",
   MAXAGE: {
-    ACCESS_TOKEN: 7 * 24 * 60 * 60 * 1000,
-    REFRESH_TOKEN: 15 * 60 * 1000,
+    ACCESS_TOKEN: 15 * 60 * 1000,
+    REFRESH_TOKEN: 7 * 24 * 60 * 60 * 1000,
   },
   PRODUCTION: "production",
 };
