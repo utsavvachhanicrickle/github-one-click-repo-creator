@@ -85,7 +85,7 @@ export async function registerPersonalUserService({
   email,
   password,
   name,
-  organization_id,
+  organization,
 }) {
   authValidations.notExistesData({ email, password });
   authValidations.valideEmail(email);
@@ -107,19 +107,25 @@ export async function registerPersonalUserService({
   });
 
   const org = await User.addAdminPersonalRelation({
-    adminid: organization_id,
+    adminid: organization.id,
     personalid: user.id,
   });
 
+  const admin_name = organization.name;
+  const personal_name = name;
+  await sendEmail.registerPersonalEmail(
+    email,
+    password,
+    personal_name,
+    admin_name,
+  );
+
   return {
     relations: {
+      name: user.name,
       unique_id: user.unique_id,
-      user: {
-        name: user.name,
-        unique_id: user.unique_id,
-        email: user.email,
-      },
-      organization_id: org.id,
+      email: user.email,
+      relation_id: org.id,
     },
   };
 }
@@ -127,18 +133,15 @@ export async function registerPersonalUserService({
 export async function adminPersonalUserRelationService({ admin_id }) {
   const relations = await User.getAdminPersonalUserByAdminId({ admin_id });
   const personalUsers = await User.findUserById({
-    uniqueIds: relations.map((relation) => relation.personalid),
+    id: relations.map((relation) => relation.personalid),
   });
   const relationsRespo = personalUsers.map((personalUser) => {
     const rel = relations.find((r) => r.personalid === personalUser.id);
     return {
+      name: personalUser.name,
       unique_id: personalUser.unique_id,
-      user: {
-        name: personalUser.name,
-        unique_id: personalUser.unique_id,
-        email: personalUser.email,
-      },
-      organization_id: rel ? rel.id : null,
+      email: personalUser.email,
+      relation_id: rel?.id || null,
     };
   });
   return {

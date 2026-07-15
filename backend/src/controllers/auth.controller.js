@@ -177,7 +177,7 @@ export async function registerPersonalUserController(req, res) {
       email,
       password,
       name,
-      organization_id: user.id,
+      organization: user,
     });
 
     return res.status(200).json({

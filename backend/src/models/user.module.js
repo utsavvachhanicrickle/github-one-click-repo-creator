@@ -41,10 +41,10 @@ export const User = {
       throw error;
     }
   },
-  findUserById: async ({ uniqueIds }) => {
-    const query = `SELECT * FROM users WHERE unique_id = ANY($1)`;
+  findUserById: async ({ id }) => {
+    const query = `SELECT * FROM users WHERE id = ANY($1)`;
     try {
-      const result = await pool.query(query, [uniqueIds]);
+      const result = await pool.query(query, [id]);
       if (result.rows.length > 0) {
         return result.rows;
       }
