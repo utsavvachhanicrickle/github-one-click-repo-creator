@@ -1,15 +1,30 @@
-import { useState } from 'react';
-import { useSelector } from 'react-redux';
-import { Shield, Bell, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { Shield, Bell, Save, Github } from 'lucide-react';
+import { fetchMe } from '../../../store/slices/authSlice.js';
 import toast from '../../../utils/Toast.js';
 
 export default function AdminSettings() {
+  const dispatch = useDispatch();
   const { me } = useSelector((state) => state.auth);
-  const [maintenance, setMaintenance] = useState(false);
-  const [allowRegistration, setAllowRegistration] = useState(true);
 
-  const handleSave = () => {
-    toast.success('Admin settings saved successfully');
+  // Check URL parameters for successful OAuth callback redirection
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('github') === 'connected') {
+      toast.success('GitHub account linked successfully!');
+      dispatch(fetchMe());
+      
+      // Clean up URL query parameters
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }, [dispatch]);
+
+
+  const handleConnectGithub = () => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+    window.location.href = `${apiBaseUrl}/api/auth/github`;
   };
 
   return (
@@ -23,76 +38,66 @@ export default function AdminSettings() {
         </p>
       </div>
 
-      <div className="p-8 rounded-3xl bg-(--bg-primary) border border-(--border) space-y-6">
+      <div className="p-8 rounded-3xl bg-(--bg-primary) border border-(--border) space-y-8">
         
-        {/* Platform parameters */}
+        {/* GitHub Integration card section */}
         <div className="space-y-6">
           <h3 className="text-sm font-black text-(--text-primary) uppercase tracking-wider flex items-center gap-2 pb-3 border-b border-(--border)/60">
-            <Shield size={16} className="text-indigo-500" />
-            System Controls
+            <Github size={16} className="text-indigo-500" />
+            Third-Party Integrations
           </h3>
 
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-(--bg-secondary)/50 border border-(--border)/60">
-            <div>
-              <span className="text-sm font-bold text-(--text-primary) block">Maintenance Mode</span>
-              <span className="text-[11px] text-(--text-secondary) block mt-0.5">Disable access to the platform for all non-admin users.</span>
+          <div className="p-6 rounded-2xl bg-(--bg-secondary)/50 border border-(--border)/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-500 shrink-0">
+                <Github size={24} />
+              </div>
+              <div className="space-y-1">
+                <span className="text-sm font-bold text-(--text-primary) block">GitHub Authentication Node</span>
+                <span className="text-[11px] text-(--text-secondary) block">
+                  Link your organization's administrative GitHub account. Linked personal accounts will automatically share this token for repository actions.
+                </span>
+              </div>
             </div>
-            <input 
-              type="checkbox" 
-              checked={maintenance}
-              onChange={(e) => setMaintenance(e.target.checked)}
-              className="w-4 h-4 text-(--primary) border-(--border) rounded-sm"
-            />
-          </div>
 
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-(--bg-secondary)/50 border border-(--border)/60">
-            <div>
-              <span className="text-sm font-bold text-(--text-primary) block">Allow New Registrations</span>
-              <span className="text-[11px] text-(--text-secondary) block mt-0.5">Enable or disable register-user REST endpoints.</span>
-            </div>
-            <input 
-              type="checkbox" 
-              checked={allowRegistration}
-              onChange={(e) => setAllowRegistration(e.target.checked)}
-              className="w-4 h-4 text-(--primary) border-(--border) rounded-sm"
-            />
-          </div>
-        </div>
-
-        {/* Email OTP configurations */}
-        <div className="space-y-6 pt-4">
-          <h3 className="text-sm font-black text-(--text-primary) uppercase tracking-wider flex items-center gap-2 pb-3 border-b border-(--border)/60">
-            <Bell size={16} className="text-indigo-500" />
-            Verification Parameters
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-(--text-secondary) block">OTP Code Expiry (Minutes)</label>
-              <input 
-                type="number" 
-                defaultValue={5} 
-                className="w-full px-4.5 py-3 rounded-xl border border-(--border) bg-(--bg-secondary) text-xs font-semibold text-(--text-primary) focus:border-(--primary) transition"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-(--text-secondary) block">Password Hash Factor</label>
-              <input 
-                type="number" 
-                defaultValue={12} 
-                className="w-full px-4.5 py-3 rounded-xl border border-(--border) bg-(--bg-secondary) text-xs font-semibold text-(--text-primary) focus:border-(--primary) transition"
-              />
+            <div className="shrink-0 sm:self-center">
+              {me?.github_id !== null ? (
+                <div className="flex items-center gap-3 bg-(--bg-primary) border border-(--border) p-2.5 pr-4 rounded-xl shadow-xs">
+                  {me.github_id !== null ? (
+                    <img 
+                      src={me.github_avatar_url} 
+                      alt={me.github_login} 
+                      className="w-7 h-7 rounded-full object-cover border border-(--border)/80"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-indigo-500 text-[10px] font-black text-white flex items-center justify-center">
+                      GH
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-[10px] text-(--text-secondary) block leading-none font-bold uppercase tracking-wider">Connected Account</span>
+                    <a 
+                      href={`https://github.com/${me.github_login}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-xs font-black text-indigo-500 hover:underline leading-normal block"
+                    >
+                      @{me.github_login}
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleConnectGithub}
+                  className="px-5 py-3.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-black transition active:scale-95 cursor-pointer shadow-md shadow-indigo-500/10 flex items-center gap-2"
+                >
+                  <Github size={14} />
+                  Connect GitHub Account
+                </button>
+              )}
             </div>
           </div>
         </div>
-
-        <button
-          onClick={handleSave}
-          className="w-full bg-(--primary) hover:bg-(--primary-hover) text-(--text-inverse) font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 transition active:scale-98 cursor-pointer text-xs"
-        >
-          <Save size={14} />
-          Save Configurations
-        </button>
 
       </div>
     </div>

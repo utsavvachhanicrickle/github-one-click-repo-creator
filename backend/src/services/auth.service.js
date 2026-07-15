@@ -23,14 +23,33 @@ export async function loginService(email, password) {
 
   const access_token = await genrateAccessToken({
     email,
-    id: user._id,
+    id: user.id,
     role: user.role,
   });
   const refresh_token = await genrateRefreshToken({
     email,
-    id: user._id,
+    id: user.id,
     role: user.role,
   });
+
+  let github_id = user.github_id;
+  let github_login = user.github_login;
+  let github_avatar_url = user.github_avatar_url;
+
+  if (user.role === "personal" && !github_id) {
+    const adminRelations = await User.getAdminPersonalUserByPersonalId({
+      personal_id: user.id,
+    });
+    if (adminRelations && adminRelations.length > 0) {
+      const adminId = adminRelations[0].adminid;
+      const userAdmin = await User.findUserById({ id: adminId });
+      if (userAdmin) {
+        github_id = userAdmin.github_id;
+        github_login = userAdmin.github_login;
+        github_avatar_url = userAdmin.github_avatar_url;
+      }
+    }
+  }
 
   return {
     user: {
@@ -38,6 +57,9 @@ export async function loginService(email, password) {
       name: user.name,
       email: user.email,
       role: user.role,
+      github_id: user.github_id,
+      github_login: user.github_login,
+      github_avatar_url: user.github_avatar_url,
     },
     access_token,
     refresh_token,

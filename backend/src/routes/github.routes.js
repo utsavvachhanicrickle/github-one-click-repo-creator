@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { requireGithubLogin } from '../middleware/auth.middleware.js';
+import { requireGithubLogin, authenticateUser } from '../middleware/auth.middleware.js';
 import {
   createWebsiteRepo,
   getUserRepos,
@@ -15,6 +15,9 @@ import {
 } from '../controllers/github.controller.js';
 
 const router = express.Router();
+
+router.use(authenticateUser);
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {

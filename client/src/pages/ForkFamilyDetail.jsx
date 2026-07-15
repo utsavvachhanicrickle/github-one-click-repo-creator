@@ -385,7 +385,7 @@ export default function ForkFamilyDetail() {
                   </div>
 
                   {/* Flow Arrow Connection */}
-                  {family.forks.find((f) => me && f.owner.toLowerCase() === me.login.toLowerCase()) && (
+                  {family.forks.find((f) => me && f.owner.toLowerCase() === me.github_login.toLowerCase()) && (
                     <div className="hidden sm:flex items-center text-(--text-secondary) select-none">
                       <div className="w-8 h-[2px] bg-(--border) relative">
                         <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 rotate-45 w-2 h-2 border-t-2 border-r-2 border-(--border)" />
@@ -395,7 +395,7 @@ export default function ForkFamilyDetail() {
 
                   {/* Your Forked Repository */}
                   {(() => {
-                    const myFork = family.forks.find((f) => me && f.owner.toLowerCase() === me.login.toLowerCase());
+                    const myFork = family.forks.find((f) => me && f.owner.toLowerCase() === me.github_login.toLowerCase());
                     return myFork ? (
                       <div className="space-y-2">
                         <span className="text-[10px] uppercase font-black text-emerald-500 tracking-wider flex items-center gap-1 select-none">

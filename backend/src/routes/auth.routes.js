@@ -17,7 +17,7 @@ import {
 
 const router = express.Router();
 
-router.get("/github", githubLogin);
+router.get("/github", authenticateUser, githubLogin);
 router.get("/github/callback", githubCallback);
 router.post("/refresh-token", refreshTokenController);
 router.get("/me", authenticateUser, getMe);

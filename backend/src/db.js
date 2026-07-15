@@ -31,20 +31,7 @@ export async function connectDB() {
     // Create pgcrypto extension if it doesn't exist
     await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto;');
 
-    // 3. Create github credentials table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS "github" (
-        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        "github_id" BIGINT UNIQUE NOT NULL,
-        "access_token" VARCHAR(255) NOT NULL,
-        "login" VARCHAR(100) NOT NULL,
-        "avatar_url" VARCHAR(255),
-        "html_url" VARCHAR(255),
-        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 4. Create users table
+    // 3. Create users table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS "users" (
         "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,11 +40,24 @@ export async function connectDB() {
         "password" VARCHAR(255) NOT NULL,
         "name" VARCHAR(100) NOT NULL,
         "role" VARCHAR(20) NOT NULL DEFAULT 'personal',
-        "github" UUID REFERENCES "github"("id") ON DELETE SET NULL,
         "user_verified" BOOLEAN DEFAULT FALSE,
         "last_login" TIMESTAMP DEFAULT NULL,
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 4. Create github credentials table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "github" (
+        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "user_id" UUID REFERENCES "users"("id") ON DELETE CASCADE,
+        "github_id" BIGINT UNIQUE NOT NULL,
+        "access_token" VARCHAR(255) NOT NULL,
+        "login" VARCHAR(100) NOT NULL,
+        "avatar_url" VARCHAR(255),
+        "html_url" VARCHAR(255),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 

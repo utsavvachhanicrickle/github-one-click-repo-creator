@@ -47,7 +47,7 @@ export default function PersonalDashboard() {
   };
 
   const loadRepos = async () => {
-    if (!me?.login) {
+    if (!me?.github_login) {
       setLoading(false);
       return;
     }
@@ -127,7 +127,7 @@ export default function PersonalDashboard() {
   }, [forkFamilies, searchQuery]);
 
   // Unlinked GitHub Onboarding View
-  if (me && !me.login) {
+  if (me && !me.github_login) {
     return (
       <div className="max-w-3xl mx-auto px-6 py-20 text-center select-none relative z-10">
         <div className="inline-block px-4.5 py-1.5 rounded-full bg-linear-to-tr from-(--primary)/10 to-(--accent)/10 border border-(--border)/60 text-(--primary) text-[11px] font-black uppercase tracking-wider mb-6">
@@ -286,7 +286,7 @@ export default function PersonalDashboard() {
                   className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3 text-sm text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
                 />
                 <div className="mt-2.5 px-3 py-2 rounded-lg bg-(--bg-secondary) border border-(--border) text-(--text-secondary) text-[11px] font-mono break-all select-none">
-                  Target: {me?.login}/<span className="font-bold text-(--text-primary)">{cleanRepoName || 'repo-name'}</span>
+                  Target: {me?.github_login}/<span className="font-bold text-(--text-primary)">{cleanRepoName || 'repo-name'}</span>
                 </div>
               </div>
 

@@ -1,5 +1,5 @@
-import crypto from "crypto";
 import axios from "axios";
+import jwt from "jsonwebtoken";
 import { Octokit } from "@octokit/rest";
 import { config } from "../config.js";
 import { User } from "../models/user.module.js";
@@ -16,8 +16,11 @@ import { verifyRefreshToken, genrateAccessToken } from "../utils/token.js";
 import authValidations from "../validations/auth.validation.js";
 
 export function githubLogin(req, res) {
-  const state = crypto.randomBytes(24).toString("hex");
-  req.session.githubOAuthState = state;
+  authValidations.userNotFound({ user: req.user });
+  authValidations.isAdminUser({ user: req.user });
+  const state = jwt.sign({ id: req.user.id }, config.jwtSecret, {
+    expiresIn: "5m",
+  });
 
   const params = new URLSearchParams({
     client_id: config.github.clientId,
@@ -38,7 +41,12 @@ export async function githubCallback(req, res, next) {
       return res.redirect(`${config.frontendUrl}/login?error=missing_code`);
     }
 
-    if (state !== req.session.githubOAuthState) {
+    // Verify JWT state to retrieve user id
+    let decoded;
+    try {
+      decoded = jwt.verify(state, config.jwtSecret);
+    } catch (err) {
+      console.error("[githubCallback] Invalid OAuth state token:", err.message);
       return res.redirect(`${config.frontendUrl}/login?error=invalid_state`);
     }
 
@@ -63,40 +71,61 @@ export async function githubCallback(req, res, next) {
     }
 
     const octokit = new Octokit({ auth: accessToken });
-    const { data: user } = await octokit.users.getAuthenticated();
+    const { data: ghUser } = await octokit.users.getAuthenticated();
 
-    // Save or update user in MongoDB
-    await User.findOneAndUpdate(
-      { githubId: user.id },
-      {
-        login: user.login,
-        avatarUrl: user.avatar_url,
-        htmlUrl: user.html_url,
-        name: user.name,
-      },
-      { upsert: true, new: true },
-    );
+    console.log(decoded.id);
 
-    req.session.githubAccessToken = accessToken;
-    req.session.githubUser = {
-      id: user.id,
-      login: user.login,
-      avatar_url: user.avatar_url,
-      html_url: user.html_url,
-      name: user.name,
-    };
+    // 1. Save or update credentials in PostgreSQL "github" table
+    await User.upsertGithubCredentials({
+      github_id: ghUser.id,
+      user_id: decoded.id,
+      access_token: accessToken,
+      login: ghUser.login,
+      avatar_url: ghUser.avatar_url,
+      html_url: ghUser.html_url,
+    });
 
-    delete req.session.githubOAuthState;
+    const user = await User.findUserById({ id: decoded.id });
+    const redirectPath =
+      user.role === "admin"
+        ? `/admin/${user.unique_id}/settings?github=connected`
+        : `/id/${user.unique_id}/settings?github=connected`;
 
-    res.redirect(`${config.frontendUrl}/dashboard`);
+    res.redirect(`${config.frontendUrl}${redirectPath}`);
   } catch (err) {
+    console.error("[githubCallback] error:", err.message);
     next(err);
   }
 }
 
-export function getMe(req, res) {
+export async function getMe(req, res) {
   const user = req.user;
   if (user) {
+    if (user.role === "personal") {
+      const adminRelations = await User.getAdminPersonalUserByPersonalId({
+        personal_id: user.id,
+      });
+      if (adminRelations && adminRelations.length > 0) {
+        const adminId = adminRelations[0].adminid;
+        const userAdmin = await User.findUserById({ id: adminId });
+        if (userAdmin) {
+          return res.json({
+            authenticated: true,
+            user: {
+              email: user.email,
+              name: user.name,
+              unique_id: user.unique_id,
+              role: user.role,
+              user_verified: user.user_verified,
+              github_id: userAdmin.github_id,
+              github_login: userAdmin.github_login,
+              github_avatar_url: userAdmin.github_avatar_url,
+            },
+          });
+        }
+      }
+    }
+
     return res.json({
       authenticated: true,
       user: {
@@ -105,6 +134,9 @@ export function getMe(req, res) {
         unique_id: user.unique_id,
         role: user.role,
         user_verified: user.user_verified,
+        github_id: user.github_id,
+        github_login: user.github_login,
+        github_avatar_url: user.github_avatar_url,
       },
     });
   }
@@ -217,13 +249,13 @@ export async function adminPersonalUserRelationController(req, res) {
 export async function refreshTokenController(req, res) {
   try {
     const refresh_token = req.cookies[COOKIESSCHEMA.REFRESH_TOKEN];
-    authValidations.refreshToken(refresh_token)
+    authValidations.refreshToken(refresh_token);
 
     const decoded = await verifyRefreshToken(refresh_token);
-    authValidations.decodedRefreshValidation(decoded)
+    authValidations.decodedRefreshValidation(decoded);
     const user = await User.findUserByEmail({ email: decoded.email });
     authValidations.userNotFound({ user });
-    
+
     // Generate new access token
     const new_access_token = await genrateAccessToken({
       email: decoded.email,
@@ -238,9 +270,13 @@ export async function refreshTokenController(req, res) {
       res,
     });
 
-    return res.status(200).json({ success: true, message: "Token refreshed successfully" });
+    return res
+      .status(200)
+      .json({ success: true, message: "Token refreshed successfully" });
   } catch (error) {
     console.error("[Refresh Token Error]:", error.message);
-    return res.status(401).json({ success: false, message: "Invalid or expired refresh token" });
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired refresh token" });
   }
 }

@@ -1,35 +1,52 @@
-import { pool } from '../db.js';
+import { pool } from "../db.js";
 
 export const User = {
-  findOneAndUpdate: async (query, update) => {
+  upsertGithubCredentials: async ({
+    github_id,
+    user_id,
+    access_token,
+    login,
+    avatar_url,
+    html_url,
+  }) => {
     const sql = `
-      INSERT INTO users (github_id, login, avatar_url, html_url, name)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO github (github_id, user_id, access_token, login, avatar_url, html_url)
+      VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (github_id)
       DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        access_token = EXCLUDED.access_token,
         login = EXCLUDED.login,
         avatar_url = EXCLUDED.avatar_url,
-        html_url = EXCLUDED.html_url,
-        name = EXCLUDED.name
+        html_url = EXCLUDED.html_url
       RETURNING *;
     `;
     const values = [
-      query.githubId,
-      update.login,
-      update.avatarUrl,
-      update.htmlUrl,
-      update.name
+      github_id,
+      user_id,
+      access_token,
+      login,
+      avatar_url,
+      html_url,
     ];
     try {
       const res = await pool.query(sql, values);
       return res.rows[0];
     } catch (err) {
-      console.error('[database] PostgreSQL User Upsert Error:', err.message);
+      console.error(
+        "[database] PostgreSQL upsertGithubCredentials Error:",
+        err.message,
+      );
       throw err;
     }
   },
   findUserByEmail: async ({ email }) => {
-    const query = `SELECT * FROM users WHERE email = $1`;
+    const query = `SELECT 
+    u.*, g.github_id as github_id, g.login as github_login, g.avatar_url as github_avatar_url  
+    FROM users u 
+    LEFT JOIN github g 
+    on g.user_id = u.id 
+    WHERE u.email = $1`;
     try {
       const result = await pool.query(query, [email]);
       if (result.rows.length > 0) {
@@ -42,19 +59,35 @@ export const User = {
     }
   },
   findUserById: async ({ id }) => {
-    const query = `SELECT * FROM users WHERE id = ANY($1)`;
+    const ids = Array.isArray(id) ? id : [id];
+
+    const query = `SELECT 
+    u.*, g.github_id as github_id, g.login as github_login, g.avatar_url as github_avatar_url  
+    FROM users u 
+    LEFT JOIN github g 
+    on g.user_id = u.id 
+    WHERE u.id = ANY($1)`;
+    // const query = `SELECT * FROM users WHERE id = ANY($1)`;
     try {
-      const result = await pool.query(query, [id]);
+      const result = await pool.query(query, [ids]);
       if (result.rows.length > 0) {
-        return result.rows;
+        return Array.isArray(id) ? result.rows : result.rows[0];
       }
-      return [];
+      return Array.isArray(id) ? [] : null;
     } catch (error) {
       console.error("[database] PostgreSQL findUserById Error:", error);
       throw error;
     }
   },
-  createUser: async ({ unique_id, email, password, name, role = 'personal', user_verified = false, user_verfied }) => {
+  createUser: async ({
+    unique_id,
+    email,
+    password,
+    name,
+    role = "personal",
+    user_verified = false,
+    user_verfied,
+  }) => {
     const verified = user_verified || user_verfied || false;
     const sql = `
       INSERT INTO users (unique_id, email, password, name, role, user_verified, created_at, updated_at)
@@ -66,7 +99,7 @@ export const User = {
       const res = await pool.query(sql, values);
       return res.rows[0];
     } catch (err) {
-      console.error('[database] PostgreSQL createUser Error:', err.message);
+      console.error("[database] PostgreSQL createUser Error:", err.message);
       throw err;
     }
   },
@@ -81,7 +114,10 @@ export const User = {
       const res = await pool.query(sql, [userId]);
       return res.rows[0];
     } catch (err) {
-      console.error('[database] PostgreSQL updateLastLogin Error:', err.message);
+      console.error(
+        "[database] PostgreSQL updateLastLogin Error:",
+        err.message,
+      );
       throw err;
     }
   },
@@ -96,11 +132,14 @@ export const User = {
       const res = await pool.query(sql, values);
       return res.rows[0];
     } catch (err) {
-      console.error('[database] PostgreSQL addAdminPersonalRelation Error:', err.message);
+      console.error(
+        "[database] PostgreSQL addAdminPersonalRelation Error:",
+        err.message,
+      );
       throw err;
     }
   },
-  getAdminPersonalUserByAdminId: async ({admin_id}) => {
+  getAdminPersonalUserByAdminId: async ({ admin_id }) => {
     const sql = `
       SELECT id, personalid FROM adminpersonalrelation WHERE adminid = $1
     `;
@@ -109,7 +148,24 @@ export const User = {
       const res = await pool.query(sql, values);
       return res.rows;
     } catch (err) {
-      console.error('[database] PostgreSQL getAdminPersonalUserByAdminId Error:', err.message);
+      console.error(
+        "[database] PostgreSQL getAdminPersonalUserByAdminId Error:",
+        err.message,
+      );
+      throw err;
+    }
+  },
+  getAdminPersonalUserByPersonalId: async ({ personal_id }) => {
+    const sql = `SELECT adminid FROM adminpersonalrelation WHERE personalid = $1`;
+    const values = [personal_id];
+    try {
+      const res = await pool.query(sql, values);
+      return res.rows;
+    } catch (err) {
+      console.error(
+        "[database] PostgreSQL getAdminPersonalUserByPersonalId Error:",
+        err.message,
+      );
       throw err;
     }
   },

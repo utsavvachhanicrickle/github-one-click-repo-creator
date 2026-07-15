@@ -259,7 +259,7 @@ export default function Dashboard() {
                   className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3 text-sm text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
                 />
                 <div className="mt-2.5 px-3 py-2 rounded-lg bg-(--bg-secondary) border border-(--border) text-(--text-secondary) text-[11px] font-mono break-all select-none">
-                  Target: {me?.login}/<span className="font-bold text-(--text-primary)">{cleanRepoName || 'repo-name'}</span>
+                  Target: {me?.github_login}/<span className="font-bold text-(--text-primary)">{cleanRepoName || 'repo-name'}</span>
                 </div>
               </div>
 

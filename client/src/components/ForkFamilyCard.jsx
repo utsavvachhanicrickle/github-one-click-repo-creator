@@ -8,7 +8,7 @@ export default function ForkFamilyCard({ family }) {
   const { parent, forks, summary } = family;
 
   const myFork = forks.find(
-    (f) => me && f.owner.toLowerCase() === me.login.toLowerCase()
+    (f) => me && f.owner.toLowerCase() === me.github_login.toLowerCase()
   );
 
   return (

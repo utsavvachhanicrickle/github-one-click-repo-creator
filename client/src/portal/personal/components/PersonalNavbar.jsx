@@ -136,16 +136,16 @@ export default function PersonalNavbar({ onToggleSidebar }) {
 
                   {/* GitHub Connection Status */}
                   <div className="space-y-2.5">
-                    {me.login ? (
+                    {me.github_login ? (
                       <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
-                        {me.avatar_url && (
+                        {me.github_avatar_url && (
                           <img
-                            src={me.avatar_url}
-                            alt={me.login}
+                            src={me.github_avatar_url}
+                            alt={me.github_login}
                             className="w-5 h-5 rounded-full ring-1 ring-emerald-500/20"
                           />
                         )}
-                        <span className="truncate">Linked: @{me.login}</span>
+                        <span className="truncate">Linked: @{me.github_login}</span>
                       </div>
                     ) : (
                       <button
