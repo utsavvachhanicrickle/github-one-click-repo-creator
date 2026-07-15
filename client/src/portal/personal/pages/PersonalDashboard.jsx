@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Loader2, Search, AlertCircle, FolderGit2, Plus, Rocket, X, GitFork, Github } from 'lucide-react';
+import { Loader2, Search, AlertCircle, FolderGit2, Plus, Rocket, X, GitFork } from 'lucide-react';
 import RepoCard from '../../../components/RepoCard.jsx';
 import { getMyRepos } from '../../../services/github.service.js';
 import { createRepo } from '../../../store/slices/repoSlice.js';
 import ForkFamilyCard from "../../../components/ForkFamilyCard.jsx"
 import { getForkFamilies } from '../../../services/github.service.js'
-import { loginWithGitHub } from '../../../services/auth.service.js';
+
 
 function normalizeRepoName(value) {
   return value
@@ -126,30 +126,30 @@ export default function PersonalDashboard() {
     );
   }, [forkFamilies, searchQuery]);
 
-  // Unlinked GitHub Onboarding View
+  // Admin hasn't connected GitHub yet — personal user must wait
   if (me && !me.github_login) {
     return (
-      <div className="max-w-3xl mx-auto px-6 py-20 text-center select-none relative z-10">
-        <div className="inline-block px-4.5 py-1.5 rounded-full bg-linear-to-tr from-(--primary)/10 to-(--accent)/10 border border-(--border)/60 text-(--primary) text-[11px] font-black uppercase tracking-wider mb-6">
-          GitHub Connection Required
+      <div className="max-w-2xl mx-auto px-6 py-24 text-center select-none relative z-10">
+        <div className="inline-flex items-center gap-2 px-4.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 text-[11px] font-black uppercase tracking-wider mb-6">
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          Waiting for Admin
         </div>
         <h2 className="text-4xl font-black text-(--text-primary) tracking-tight mb-4">
-          Connect your GitHub Profile
+          GitHub Not Yet Connected
         </h2>
-        <p className="text-sm text-(--text-secondary) leading-relaxed max-w-lg mx-auto mb-8 font-medium">
-          To manage templates, upload folders, rename Flutter apps, and compare commit trees, you need to connect your GitHub account to your profile ID.
+        <p className="text-sm text-(--text-secondary) leading-relaxed max-w-lg mx-auto font-medium">
+          Your administrator hasn't linked their GitHub account yet. Repository management, uploads, and branch tools will be available once your admin connects their GitHub profile from their settings.
         </p>
-
-        <button
-          onClick={loginWithGitHub}
-          className="inline-flex items-center justify-center gap-2.5 bg-(--primary) hover:bg-(--primary-hover) text-(--text-inverse) font-extrabold px-8 py-4.5 rounded-2xl transition shadow-xl shadow-(--primary)/15 active:scale-95 cursor-pointer text-sm"
-        >
-          <Github size={20} />
-          Link GitHub Account
-        </button>
+        <div className="mt-8 px-6 py-5 rounded-2xl bg-(--bg-primary) border border-amber-500/20 text-left space-y-2 max-w-md mx-auto">
+          <p className="text-xs font-black text-(--text-secondary) uppercase tracking-wider">What to do?</p>
+          <p className="text-sm text-(--text-primary) font-medium">
+            Ask your admin to go to <span className="font-black text-amber-500">Admin Settings → Third-Party Integrations</span> and connect their GitHub account.
+          </p>
+        </div>
       </div>
     );
   }
+
 
   return (
     <div className="w-full min-h-screen bg-(--bg) pb-12">

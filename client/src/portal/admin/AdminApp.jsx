@@ -5,6 +5,7 @@ import AdminSidebar from "./components/AdminSidebar.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
 import AdminUserAssigned from "./pages/AdminUserAssigned.jsx";
+import AdminStoreList from "./pages/AdminStoreList.jsx";
 
 export default function AdminApp() {
   const { uniqueId } = useParams();
@@ -27,6 +28,10 @@ export default function AdminApp() {
     {
       path: "/user-assigned",
       element: <AdminUserAssigned />,
+    },
+    {
+      path: "/stores",
+      element: <AdminStoreList />,
     },
     {
       path: "/settings",

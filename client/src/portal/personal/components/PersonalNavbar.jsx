@@ -5,7 +5,6 @@ import {
   Sun,
   Moon,
   LogOut,
-  Github,
   Menu,
   Mail,
   FolderGit2,
@@ -14,7 +13,7 @@ import { logoutUser } from "../../../store/slices/authSlice.js";
 import { clearRepoState } from "../../../store/slices/repoSlice.js";
 import { DarkModeContext } from "../../../context/darkModeContext.jsx";
 import Logo from "../../../components/Logo.jsx";
-import { loginWithGitHub } from "../../../services/auth.service.js";
+
 import toast from "../../../utils/Toast.js";
 
 export default function PersonalNavbar({ onToggleSidebar }) {
@@ -148,13 +147,10 @@ export default function PersonalNavbar({ onToggleSidebar }) {
                         <span className="truncate">Linked: @{me.github_login}</span>
                       </div>
                     ) : (
-                      <button
-                        onClick={loginWithGitHub}
-                        className="w-full inline-flex items-center justify-center gap-2 bg-zinc-800 text-white font-extrabold px-4.5 py-2.5 rounded-xl hover:bg-zinc-700 transition-all duration-200 text-xs cursor-pointer shadow-xs"
-                      >
-                        <Github size={14} />
-                        Link GitHub Profile
-                      </button>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/15 text-amber-600 text-xs font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                        <span className="truncate">Admin GitHub not connected</span>
+                      </div>
                     )}
 
                     <div className="flex items-center gap-2 text-xs font-bold text-(--text-secondary) px-1">

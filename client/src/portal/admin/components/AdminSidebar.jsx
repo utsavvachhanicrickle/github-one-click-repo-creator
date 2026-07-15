@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Settings, Users } from "lucide-react";
+import { LayoutDashboard, Settings, Users, FolderGit2 } from "lucide-react";
 
 export default function AdminSidebar({
   uniqueId,
@@ -18,6 +18,12 @@ export default function AdminSidebar({
       path: `/admin/${uniqueId}/user-assigned`,
       label: "Assigned Users",
       icon: <Users size={18} />,
+      end: false,
+    },
+    {
+      path: `/admin/${uniqueId}/stores`,
+      label: "My Stores",
+      icon: <FolderGit2 size={18} />,
       end: false,
     },
     {

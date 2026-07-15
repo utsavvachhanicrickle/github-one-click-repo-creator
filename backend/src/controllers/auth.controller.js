@@ -146,6 +146,8 @@ export async function getMe(req, res) {
 }
 
 export function logoutUser(req, res) {
+  res.clearCookie(COOKIESSCHEMA.ACCESS_TOKEN);
+  res.clearCookie(COOKIESSCHEMA.REFRESH_TOKEN);
   req.session.destroy(() => {
     res.clearCookie("repo_creator_sid");
     res.json({ ok: true });

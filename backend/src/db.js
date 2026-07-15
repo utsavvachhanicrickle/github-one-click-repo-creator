@@ -84,6 +84,20 @@ export async function connectDB() {
       );
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "store" (
+        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "admin_id" UUID REFERENCES "users"("id") ON DELETE CASCADE,
+        "creator_id" UUID REFERENCES "users"("id") ON DELETE CASCADE,
+        "assigned_ids" UUID[] DEFAULT '{}',
+        "store_name" VARCHAR(100) NOT NULL,
+        "repo_name" VARCHAR(100) NOT NULL,
+        "github_link" VARCHAR(255) UNIQUE NOT NULL,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT NULL
+      )
+    `);
+
     console.log('[database] Database DDL verification & table seeding completed.');
   } catch (error) {
     console.error(`[database] PostgreSQL Connection or DDL Error: ${error.message}`);

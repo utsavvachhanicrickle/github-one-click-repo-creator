@@ -5,6 +5,7 @@ import PersonalSidebar from './components/PersonalSidebar.jsx';
 import PersonalDashboard from './pages/PersonalDashboard.jsx';
 import RepoDetail from '../../pages/RepoDetail.jsx';
 import ForkFamilyDetail from '../../pages/ForkFamilyDetail.jsx';
+import PersonalStoreList from "./pages/PersonalStoreList.jsx"
 
 export default function PersonalApp() {
   const { uniqueId } = useParams();
@@ -23,6 +24,10 @@ export default function PersonalApp() {
     {
       path: "/",
       element: <PersonalDashboard />
+    },
+    {
+      path: "/stores",
+      element: <PersonalStoreList />
     },
     {
       path: "/repos/:owner/:repo",
