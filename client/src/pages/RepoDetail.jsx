@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, Github, GitBranch, ShieldAlert, CheckCircle2, ExternalLink, Plus, X, Rocket } from 'lucide-react';
 import Navbar from '../components/Navbar.jsx';
 import BranchSelector from '../components/BranchSelector.jsx';
 import FolderUpload from '../components/FolderUpload.jsx';
-import ChangesPreview from '../components/ChangesPreview.jsx';
-import { getRepoBranches, compareFolderUpload, commitFolderUpload, createRepoBranch, renameRemoteFlutterApp } from '../services/github.service.js';
+import { io } from 'socket.io-client';
+import { getRepoBranches, commitFolderUpload, createRepoBranch, renameRemoteFlutterApp } from '../services/github.service.js';
+
+const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
 function getCleanRelativePath(file) {
   const cleanPath = (file.webkitRelativePath || file.name).replace(/\\/g, '/');
@@ -28,15 +30,35 @@ export default function RepoDetail() {
   const [files, setFiles] = useState([]);
   const [fileStats, setFileStats] = useState(null);
   
-  const [comparing, setComparing] = useState(false);
-  const [comparisonResult, setComparisonResult] = useState(null);
-  
   const [includeDeletions, setIncludeDeletions] = useState(false);
-  const [commitMessage, setCommitMessage] = useState('');
   const [committing, setCommitting] = useState(false);
   
   const [successResult, setSuccessResult] = useState(null);
   const [error, setError] = useState('');
+
+  const [socket, setSocket] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const logsEndRef = useRef(null);
+
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs]);
+
+  useEffect(() => {
+    const newSocket = io(SOCKET_URL);
+    setSocket(newSocket);
+
+    newSocket.on('upload_progress', (data) => {
+      setLogs((prev) => [...prev, data]);
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, []);
 
   // Active workspace tab state ('upload' | 'flutter-rename')
   const [activeTab, setActiveTab] = useState('upload');
@@ -138,87 +160,56 @@ export default function RepoDetail() {
   const handleFolderSelect = (validFiles, stats) => {
     setFiles(validFiles);
     setFileStats(stats);
-    setComparisonResult(null);
     setSuccessResult(null);
     setError('');
+    handleCommit(validFiles);
   };
 
-  const handleCompare = async () => {
-    if (files.length === 0) {
-      setError('Please select a folder to upload first.');
-      return;
-    }
+  const handleCommit = async (uploadFiles = files) => {
+    if (uploadFiles.length === 0) return;
     try {
-      setComparing(true);
-      setError('');
-      setComparisonResult(null);
-      setSuccessResult(null);
-
-      const formData = new FormData();
-      formData.append('branch', selectedBranch);
-      formData.append('includeDeletions', includeDeletions.toString());
-      formData.append('flutterAppName', flutterAppName.trim());
-      
-      const relativePaths = [];
-      files.forEach((file) => {
-        formData.append('files', file);
-        relativePaths.push(getCleanRelativePath(file));
-      });
-      formData.append('paths', JSON.stringify(relativePaths));
-
-      const result = await compareFolderUpload(owner, repo, formData);
-      setComparisonResult(result.summary);
-
-      // Select all files by default
-      const allPaths = new Set([
-        ...result.summary.added,
-        ...result.summary.modified,
-        ...result.summary.deleted
-      ]);
-      setSelectedPaths(allPaths);
-
-      // Auto-prefill unique commit message suggestion
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setCommitMessage(`Sync upload - ${timeStr}`);
-    } catch (err) {
-      setError(err.message || 'Failed to compare local folder with GitHub branch.');
-    } finally {
-      setComparing(false);
-    }
-  };
-
-  const handleCommit = async () => {
-    try {
+      setUploading(true);
       setCommitting(true);
       setError('');
+      setLogs([]);
+
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      let h = now.getHours();
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const ampm = h >= 12 ? 'pm' : 'am';
+      h = h % 12;
+      h = h ? h : 12;
+      const timeStr = `${h}:${m} ${ampm}`;
+      const dateStr = `${dd}-${mm}-${yyyy}`;
+      const autoCommitMsg = `${me?.name || me?.github_login || 'User'}_${dateStr}-${timeStr}`;
 
       const formData = new FormData();
       formData.append('branch', selectedBranch);
-      formData.append('commitMessage', commitMessage.trim() || 'Upload project files from dashboard');
+      formData.append('commitMessage', autoCommitMsg);
       formData.append('includeDeletions', includeDeletions.toString());
       formData.append('flutterAppName', flutterAppName.trim());
+      if (socket) {
+        formData.append('socketId', socket.id);
+      }
 
       const relativePaths = [];
-      files.forEach((file) => {
+      uploadFiles.forEach((file) => {
         const cleanPath = getCleanRelativePath(file);
-        if (selectedPaths.has(cleanPath)) {
-          formData.append('files', file);
-          relativePaths.push(cleanPath);
-        }
+        formData.append('files', file);
+        relativePaths.push(cleanPath);
       });
       formData.append('paths', JSON.stringify(relativePaths));
-      formData.append('selectedPaths', JSON.stringify(Array.from(selectedPaths)));
 
       const result = await commitFolderUpload(owner, repo, formData);
       setSuccessResult(result);
       setFiles([]);
       setFileStats(null);
-      setComparisonResult(null);
-      setSelectedPaths(new Set());
-      setCommitMessage('');
     } catch (err) {
       setError(err.message || 'Failed to commit and push changes.');
+      setLogs(prev => [...prev, { message: `Error: ${err.message}`, type: 'error', timestamp: new Date().toISOString() }]);
     } finally {
       setCommitting(false);
     }
@@ -325,9 +316,9 @@ export default function RepoDetail() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          {/* Left Inputs Column */}
-          <div className="md:col-span-6 space-y-6">
+        <div className="max-w-3xl mx-auto">
+          {/* Main Controls */}
+          <div className="space-y-6">
             <div className="bg-(--bg-primary) border border-(--border) rounded-3xl p-6 shadow-xs space-y-6">
               {branchesLoading ? (
                 <div className="flex items-center gap-3 text-sm text-(--text-secondary) py-4 select-none">
@@ -340,14 +331,14 @@ export default function RepoDetail() {
                     branches={branches}
                     selectedBranch={selectedBranch}
                     onSelectBranch={setSelectedBranch}
-                    loading={committing || comparing}
+                    loading={committing || branchesLoading}
                   />
 
                   {/* Create Branch Option */}
                   {!showNewBranchInput ? (
                     <button
                       onClick={() => setShowNewBranchInput(true)}
-                      disabled={committing || comparing}
+                      disabled={committing || branchesLoading}
                       className="text-xs font-bold text-(--primary) hover:text-(--primary-hover) flex items-center gap-1.5 transition select-none disabled:opacity-50 cursor-pointer"
                     >
                       <Plus size={14} />
@@ -438,12 +429,9 @@ export default function RepoDetail() {
                     <input
                       type="text"
                       value={flutterAppName}
-                      onChange={(e) => {
-                        setFlutterAppName(e.target.value);
-                        setComparisonResult(null);
-                      }}
+                      onChange={(e) => setFlutterAppName(e.target.value)}
                       placeholder="e.g. utsav_vachhani"
-                      disabled={committing || comparing}
+                      disabled={committing}
                       className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3.5 text-xs text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
                     />
                     <p className="text-[10px] text-(--text-secondary) select-none leading-relaxed">
@@ -456,11 +444,8 @@ export default function RepoDetail() {
                       type="checkbox"
                       id="includeDeletions"
                       checked={includeDeletions}
-                      onChange={(e) => {
-                        setIncludeDeletions(e.target.checked);
-                        setComparisonResult(null);
-                      }}
-                      disabled={committing || comparing}
+                      onChange={(e) => setIncludeDeletions(e.target.checked)}
+                      disabled={committing}
                       className="w-4.5 h-4.5 rounded border-(--border) bg-(--bg-secondary) text-(--primary) focus:ring-(--primary) cursor-pointer disabled:opacity-50"
                     />
                     <label
@@ -470,21 +455,6 @@ export default function RepoDetail() {
                       Enable Safe Delete (Remove missing local files on remote branch)
                     </label>
                   </div>
-
-                  <button
-                    onClick={handleCompare}
-                    disabled={files.length === 0 || comparing || committing || branchesLoading}
-                    className="w-full bg-(--primary) hover:bg-(--primary-hover) text-(--text-inverse) font-extrabold py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
-                  >
-                    {comparing ? (
-                      <>
-                        <Loader2 className="animate-spin" size={18} />
-                        Comparing Changes...
-                      </>
-                    ) : (
-                      'Compare Changes'
-                    )}
-                  </button>
                 </div>
               ) : (
                 <div className="space-y-6 animate-in fade-in duration-200">
@@ -523,68 +493,54 @@ export default function RepoDetail() {
               )}
             </div>
           </div>
+        </div>
 
-          {/* Right Preview/Commit Column */}
-          <div className="md:col-span-6">
-            {comparisonResult ? (
-              <div className="bg-(--bg-primary) border border-(--border) rounded-3xl p-6 shadow-xs space-y-6">
-                <ChangesPreview
-                  summary={comparisonResult}
-                  selectedPaths={selectedPaths}
-                  onTogglePath={handleTogglePath}
-                />
-
-                {(comparisonResult.added.length > 0 ||
-                  comparisonResult.modified.length > 0 ||
-                  (includeDeletions && comparisonResult.deleted.length > 0)) ? (
-                  <div className="space-y-4 pt-4 border-t border-(--border)">
-                    <div>
-                      <label className="block text-xs font-bold text-(--text-primary) mb-2 select-none">
-                        Commit Message
-                      </label>
-                      <input
-                        type="text"
-                        value={commitMessage}
-                        onChange={(e) => setCommitMessage(e.target.value)}
-                        placeholder="Upload project files from dashboard"
-                        disabled={committing}
-                        className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3.5 text-xs text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
-                      />
-                    </div>
-
-                    <button
-                      onClick={handleCommit}
-                      disabled={committing}
-                      className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) hover:text-(--text-primary) font-black py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm"
-                    >
-                      {committing ? (
-                        <>
-                          <Loader2 className="animate-spin" size={18} />
-                          Committing & Pushing...
-                        </>
-                      ) : (
-                        'Commit & Push Changes'
-                      )}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center select-none text-xs text-(--text-primary) leading-relaxed">
-                    <span className="font-extrabold text-amber-600 block mb-1">No Changes Detected</span>
-                    Local folder matches the remote branch exactly. To force a commit, add a unique file (e.g. <code className="font-bold underline text-amber-700 font-mono text-[10px]">unique-sync.txt</code>) or modify any file in your folder.
-                  </div>
+        {/* Live Upload Logs Modal popup */}
+        {(uploading || logs.length > 0) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-(--bg-primary) border border-(--border) rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+              <div className="px-6 py-4 border-b border-(--border) flex justify-between items-center bg-(--bg-secondary)/50">
+                <h3 className="text-sm font-bold text-(--text-primary) flex items-center gap-2 select-none">
+                  {committing ? (
+                    <Loader2 className="animate-spin text-(--primary)" size={16} />
+                  ) : (
+                    <CheckCircle2 className="text-(--success)" size={16} />
+                  )}
+                  Live Upload Logs
+                </h3>
+                {!committing && (
+                  <button
+                    onClick={() => {
+                      setUploading(false);
+                      setLogs([]);
+                    }}
+                    className="p-1.5 rounded-full hover:bg-(--bg-active) text-(--text-secondary) hover:text-(--text-primary) transition cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
                 )}
               </div>
-            ) : (
-              <div className="border-2 border-dashed border-(--border) rounded-3xl p-12 text-center text-(--text-secondary) select-none bg-(--bg-primary)/40">
-                <GitBranch className="mx-auto mb-3 text-(--text-secondary)/60" size={32} />
-                <p className="text-sm font-bold text-(--text-primary)">Preview Changes</p>
-                <p className="text-xs mt-1">
-                  Upload a folder and click "Compare Changes" to preview file updates.
-                </p>
+              
+              <div className="flex-1 bg-black p-4 overflow-y-auto font-mono text-[10px] sm:text-xs text-gray-300 space-y-1 custom-scrollbar min-h-[300px]">
+                {logs.map((log, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <span className="text-gray-500 shrink-0 select-none">
+                      [{new Date(log.timestamp).toLocaleTimeString()}]
+                    </span>
+                    <span className={log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-blue-300'}>
+                      {log.message}
+                    </span>
+                  </div>
+                ))}
+                {logs.length === 0 && committing && (
+                  <div className="text-gray-500 italic">Waiting for backend response...</div>
+                )}
+                {/* Auto-scroll target */}
+                <div ref={logsEndRef} />
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

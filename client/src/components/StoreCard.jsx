@@ -1,11 +1,40 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { FolderGit2, Calendar, ExternalLink, User } from "lucide-react";
 
 export default function StoreCard({ store }) {
+  const navigate = useNavigate();
+  const { me } = useSelector((state) => state.auth);
+  
   const { store_name, repo_name, github_link, created_at, creator_id } = store;
 
+  let owner = "";
+  try {
+    const urlParts = new URL(github_link).pathname.split("/").filter(Boolean);
+    owner = urlParts[0] || "";
+  } catch (e) {
+    // silently fail
+  }
+
+  const linkTo = me?.role === "admin"
+    ? `/admin/${me?.unique_id}/repos/${owner}/${repo_name}`
+    : `/id/${me?.unique_id}/repos/${owner}/${repo_name}`;
+
+  const handleCardClick = (e) => {
+    if (e.target.closest("a") || e.target.closest("button")) {
+      return;
+    }
+    if (owner && repo_name) {
+      navigate(linkTo);
+    }
+  };
+
   return (
-    <div className="p-6 rounded-3xl bg-(--bg-primary) border border-(--border) hover:border-(--primary) transition shadow-xs hover:shadow-md flex flex-col justify-between h-full group relative overflow-hidden select-none">
+    <div 
+      onClick={handleCardClick}
+      className="p-6 rounded-3xl bg-(--bg-primary) border border-(--border) hover:border-(--primary) transition shadow-xs hover:shadow-md flex flex-col justify-between h-full group relative overflow-hidden select-none cursor-pointer"
+    >
       {/* Glow background indicator on hover */}
       <div className="absolute inset-0 bg-linear-to-tr from-(--primary) to-(--accent) opacity-0 group-hover:opacity-[0.03] transition-opacity duration-300 pointer-events-none" />
 

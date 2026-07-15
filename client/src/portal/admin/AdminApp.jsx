@@ -6,6 +6,7 @@ import AdminDashboard from "./pages/AdminDashboard.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
 import AdminUserAssigned from "./pages/AdminUserAssigned.jsx";
 import AdminStoreList from "./pages/AdminStoreList.jsx";
+import RepoDetail from "../../pages/RepoDetail.jsx";
 
 export default function AdminApp() {
   const { uniqueId } = useParams();
@@ -32,6 +33,10 @@ export default function AdminApp() {
     {
       path: "/stores",
       element: <AdminStoreList />,
+    },
+    {
+      path: "/repos/:owner/:repo",
+      element: <RepoDetail />,
     },
     {
       path: "/settings",

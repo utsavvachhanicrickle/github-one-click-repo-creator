@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -9,8 +10,10 @@ import { config } from './config.js';
 import { connectDB, pool } from './db.js';
 import apiRoutes from './routes/api.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { initSocket } from './socket.js';
 
 const app = express();
+const server = http.createServer(app);
 const PgSessionStore = pgSession(session);
 
 app.set('trust proxy', 1);
@@ -19,12 +22,13 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
-app.use(
-  cors({
-    origin: config.frontendUrl,
-    credentials: true
-  })
-);
+const corsOptions = {
+  origin: config.frontendUrl,
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+initSocket(server, corsOptions);
 
 app.use(
   session({
@@ -55,7 +59,7 @@ app.use(errorHandler);
 
 connectDB().then(() => {
   if (!process.env.VERCEL) {
-    app.listen(config.port, () => {
+    server.listen(config.port, () => {
       console.log(`Backend running on http://localhost:${config.port}`);
     });
   }

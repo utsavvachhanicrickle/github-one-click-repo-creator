@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { createStarterWebsiteFiles } from '../services/starterTemplate.service.js';
 import { createRepoWithFiles } from '../services/githubRepo.service.js';
 import { User } from '../models/user.module.js';
+import { getIo } from '../socket.js';
 
 const createWebsiteSchema = z.object({
   repoName: z
@@ -384,11 +385,23 @@ export async function compareUpload(req, res, next) {
 export async function commitUpload(req, res, next) {
   try {
     const { owner, repo } = req.params;
-    const { branch, commitMessage = 'Upload project files from dashboard', includeDeletions = 'false' } = req.body;
+    const { branch, commitMessage, includeDeletions = 'false', socketId } = req.body;
+
+    const emitLog = (message, type = 'info') => {
+      if (socketId) {
+        try {
+          getIo().to(socketId).emit('upload_progress', { message, type, timestamp: new Date().toISOString() });
+        } catch (e) {
+          console.warn('Socket error:', e);
+        }
+      }
+    };
 
     if (!branch) {
       return res.status(400).json({ message: 'Branch is required' });
     }
+
+    emitLog(`Starting upload process for repository: ${owner}/${repo} on branch ${branch}...`);
 
     const octokit = new Octokit({ auth: req.session.githubAccessToken });
     const uploadedFiles = req.files || [];
@@ -428,6 +441,8 @@ export async function commitUpload(req, res, next) {
 
     const flutterAppName = req.body.flutterAppName;
     const renamedTo = processFlutterRenames(validUploadedFiles, flutterAppName);
+
+    emitLog(`Processed ${validUploadedFiles.length} files (Ignored ${ignoredCount} invalid/system files). Fetching latest branch state...`);
 
     let latestCommitSha = null;
     let isInitialCommit = false;
@@ -526,8 +541,11 @@ export async function commitUpload(req, res, next) {
       });
     }
 
+    emitLog(`Analyzing differences. Found ${filesToUpload.length} file(s) that need uploading.`);
+
     // Create blobs for changed files
-    const blobPromises = filesToUpload.map(async (item) => {
+    const blobPromises = filesToUpload.map(async (item, index) => {
+      emitLog(`[${index + 1}/${filesToUpload.length}] Creating blob for ${item.path}...`);
       const blobRes = await octokit.git.createBlob({
         owner,
         repo,
@@ -578,6 +596,7 @@ export async function commitUpload(req, res, next) {
       });
     }
 
+    emitLog(`Building the new commit tree structure...`);
     const newTreeRes = await octokit.git.createTree({
       owner,
       repo,
@@ -585,10 +604,11 @@ export async function commitUpload(req, res, next) {
     });
     const newTreeSha = newTreeRes.data.sha;
 
+    emitLog(`Creating commit in GitHub with message: "${commitMessage}"...`);
     const commitParams = {
       owner,
       repo,
-      message: commitMessage,
+      message: commitMessage || 'Upload project files from dashboard',
       tree: newTreeSha
     };
     if (!isInitialCommit) {
@@ -598,6 +618,7 @@ export async function commitUpload(req, res, next) {
     const newCommitRes = await octokit.git.createCommit(commitParams);
     const newCommitSha = newCommitRes.data.sha;
 
+    emitLog(`Updating branch ${branch} to new commit reference...`);
     if (isInitialCommit) {
       await octokit.git.createRef({
         owner,
@@ -613,6 +634,8 @@ export async function commitUpload(req, res, next) {
         sha: newCommitSha
       });
     }
+
+    emitLog(`Upload process completed successfully!`, 'success');
 
     res.json({
       success: true,
