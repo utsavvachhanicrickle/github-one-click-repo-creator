@@ -1,25 +1,35 @@
-import { z } from 'zod';
-import { Octokit } from '@octokit/rest';
-import crypto from 'crypto';
-import { createRepoWithFiles, getAutomationTemplateFiles } from '../services/githubRepo.service.js';
-import { generateAndCommitAppIcons } from '../services/appIcon.service.js';
-import { getIo } from '../socket.js';
+import { z } from "zod";
+import { Octokit } from "@octokit/rest";
+import crypto from "crypto";
+import {
+  createRepoWithFiles,
+  getAutomationTemplateFiles,
+} from "../services/githubRepo.service.js";
+import { generateAndCommitAppIcons } from "../services/appIcon.service.js";
+import { getIo } from "../socket.js";
 
 const createWebsiteSchema = z.object({
   repoName: z
     .string()
-    .min(3, 'Repo name must be at least 3 characters')
-    .max(80, 'Repo name is too long')
-    .regex(/^[a-zA-Z0-9._-]+$/, 'Repo name can only contain letters, numbers, dot, underscore, and dash'),
+    .min(3, "Repo name must be at least 3 characters")
+    .max(80, "Repo name is too long")
+    .regex(
+      /^[a-zA-Z0-9._-]+$/,
+      "Repo name can only contain letters, numbers, dot, underscore, and dash",
+    ),
   isPrivate: z.boolean().default(false),
-  description: z.string().max(250).optional().default('Website generated from my builder'),
-  templateType: z.enum(['vite-react', 'blank']).default('blank')
+  description: z
+    .string()
+    .max(250)
+    .optional()
+    .default("Website generated from my builder"),
+  templateType: z.enum(["vite-react", "blank"]).default("blank"),
 });
 
 export async function createWebsiteRepo(req, res, next) {
   try {
     const input = createWebsiteSchema.parse(req.body);
-    // Fetch the files from the github_automation template
+    // Fetch the files from the flutter_demo template
     const files = await getAutomationTemplateFiles();
 
     // 3. Create the new repository and populate it with the downloaded files
@@ -27,24 +37,28 @@ export async function createWebsiteRepo(req, res, next) {
       accessToken: req.session.githubAccessToken,
       repoName: input.repoName,
       description: input.description,
-      isPrivate: true, 
-      files
+      isPrivate: true,
+      files,
     });
 
     res.status(201).json({
-      message: 'Repository created successfully with automation template files.',
+      message:
+        "Repository created successfully with automation template files.",
       repo: result,
       fileCount: files.length,
-      usedN8n: false
+      usedN8n: false,
     });
   } catch (err) {
-    if (err.name === 'ZodError') {
-      return res.status(400).json({ message: err.errors[0]?.message || 'Invalid input' });
+    if (err.name === "ZodError") {
+      return res
+        .status(400)
+        .json({ message: err.errors[0]?.message || "Invalid input" });
     }
 
     if (err.status === 422) {
       return res.status(422).json({
-        message: 'GitHub could not create this repo. The repo name may already exist in your account.'
+        message:
+          "GitHub could not create this repo. The repo name may already exist in your account.",
       });
     }
 
@@ -56,28 +70,28 @@ export async function createWebsiteRepo(req, res, next) {
 function isIgnoredOrDangerousPath(relativePath) {
   if (!relativePath) return true;
 
-  const cleanPath = relativePath.replace(/\\/g, '/');
+  const cleanPath = relativePath.replace(/\\/g, "/");
 
   if (
-    cleanPath.includes('../') ||
-    cleanPath.startsWith('/') ||
-    cleanPath.trim() === ''
+    cleanPath.includes("../") ||
+    cleanPath.startsWith("/") ||
+    cleanPath.trim() === ""
   ) {
     return true;
   }
 
-  const segments = cleanPath.split('/');
+  const segments = cleanPath.split("/");
   const ignoredNames = new Set([
-    'node_modules',
-    '.git',
-    'dist',
-    'build',
-    'coverage',
-    '.env',
-    '.env.local',
-    '.env.production',
-    '.DS_Store',
-    'package-lock.json'
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    "coverage",
+    ".env",
+    ".env.local",
+    ".env.production",
+    ".DS_Store",
+    "package-lock.json",
   ]);
 
   for (const segment of segments) {
@@ -85,7 +99,7 @@ function isIgnoredOrDangerousPath(relativePath) {
       return true;
     }
     // Ignore hidden files except normal config files like .gitignore
-    if (segment.startsWith('.') && segment !== '.gitignore') {
+    if (segment.startsWith(".") && segment !== ".gitignore") {
       return true;
     }
   }
@@ -96,42 +110,55 @@ function isIgnoredOrDangerousPath(relativePath) {
 // Helper to calculate Git blob SHA
 function calculateGitSha(buffer) {
   const header = `blob ${buffer.length}\0`;
-  const hash = crypto.createHash('sha1');
+  const hash = crypto.createHash("sha1");
   hash.update(header);
   hash.update(buffer);
-  return hash.digest('hex');
+  return hash.digest("hex");
 }
 
 // Intercept and rename Flutter App Names in memory
 function processFlutterRenames(validUploadedFiles, flutterAppName) {
   if (!flutterAppName) return null;
 
-  const cleanAppName = flutterAppName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+  const cleanAppName = flutterAppName
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "");
   if (!cleanAppName) return null;
 
   let didRename = false;
   for (const item of validUploadedFiles) {
     const p = item.path.toLowerCase();
-    if (p.endsWith('macos/runner/configs/appinfo.xcconfig')) {
-      let content = item.file.buffer.toString('utf8');
+    if (p.endsWith("macos/runner/configs/appinfo.xcconfig")) {
+      let content = item.file.buffer.toString("utf8");
       // Replace PRODUCT_NAME = ...
-      content = content.replace(/PRODUCT_NAME\s*=\s*[a-zA-Z0-9._-]+/g, `PRODUCT_NAME = ${cleanAppName}`);
-      item.file.buffer = Buffer.from(content, 'utf8');
+      content = content.replace(
+        /PRODUCT_NAME\s*=\s*[a-zA-Z0-9._-]+/g,
+        `PRODUCT_NAME = ${cleanAppName}`,
+      );
+      item.file.buffer = Buffer.from(content, "utf8");
       item.file.size = item.file.buffer.length;
       // Recompute SHA
       item.sha = calculateGitSha(item.file.buffer);
       didRename = true;
-      console.log(`[flutter-rename] Renamed PRODUCT_NAME in AppInfo.xcconfig to: ${cleanAppName}`);
-    } else if (p.endsWith('android/app/src/main/androidmanifest.xml')) {
-      let content = item.file.buffer.toString('utf8');
+      console.log(
+        `[flutter-rename] Renamed PRODUCT_NAME in AppInfo.xcconfig to: ${cleanAppName}`,
+      );
+    } else if (p.endsWith("android/app/src/main/androidmanifest.xml")) {
+      let content = item.file.buffer.toString("utf8");
       // Replace android:label="..."
-      content = content.replace(/android:label="[^"]*"/g, `android:label="${cleanAppName}"`);
-      item.file.buffer = Buffer.from(content, 'utf8');
+      content = content.replace(
+        /android:label="[^"]*"/g,
+        `android:label="${cleanAppName}"`,
+      );
+      item.file.buffer = Buffer.from(content, "utf8");
       item.file.size = item.file.buffer.length;
       // Recompute SHA
       item.sha = calculateGitSha(item.file.buffer);
       didRename = true;
-      console.log(`[flutter-rename] Renamed android:label in AndroidManifest.xml to: ${cleanAppName}`);
+      console.log(
+        `[flutter-rename] Renamed android:label in AndroidManifest.xml to: ${cleanAppName}`,
+      );
     }
   }
   return didRename ? cleanAppName : null;
@@ -142,8 +169,8 @@ export async function getUserRepos(req, res, next) {
   try {
     const octokit = new Octokit({ auth: req.session.githubAccessToken });
     const { data: repos } = await octokit.repos.listForAuthenticatedUser({
-      sort: 'updated',
-      per_page: 100
+      sort: "updated",
+      per_page: 100,
     });
 
     const formattedRepos = repos.map((r) => ({
@@ -153,7 +180,7 @@ export async function getUserRepos(req, res, next) {
       defaultBranch: r.default_branch,
       updatedAt: r.updated_at,
       language: r.language,
-      htmlUrl: r.html_url
+      htmlUrl: r.html_url,
     }));
 
     res.json(formattedRepos);
@@ -171,11 +198,14 @@ export async function getRepoBranches(req, res, next) {
       const { data: branches } = await octokit.repos.listBranches({
         owner,
         repo,
-        per_page: 100
+        per_page: 100,
       });
       res.json(branches.map((b) => b.name));
     } catch (err) {
-      if (err.status === 409 && err.message?.includes('Git Repository is empty')) {
+      if (
+        err.status === 409 &&
+        err.message?.includes("Git Repository is empty")
+      ) {
         return res.json([]);
       }
       throw err;
@@ -192,10 +222,10 @@ export async function createBranch(req, res, next) {
     const { branchName, sourceBranch } = req.body;
 
     if (!branchName) {
-      return res.status(400).json({ message: 'Branch name is required' });
+      return res.status(400).json({ message: "Branch name is required" });
     }
     if (!sourceBranch) {
-      return res.status(400).json({ message: 'Source branch is required' });
+      return res.status(400).json({ message: "Source branch is required" });
     }
 
     const octokit = new Octokit({ auth: req.session.githubAccessToken });
@@ -205,35 +235,42 @@ export async function createBranch(req, res, next) {
       const refRes = await octokit.git.getRef({
         owner,
         repo,
-        ref: `heads/${sourceBranch}`
+        ref: `heads/${sourceBranch}`,
       });
       sourceSha = refRes.data.object.sha;
     } catch (err) {
-      if (err.status === 409 && err.message?.includes('Git Repository is empty')) {
+      if (
+        err.status === 409 &&
+        err.message?.includes("Git Repository is empty")
+      ) {
         return res.status(409).json({
-          message: 'Cannot create a new branch: the repository is empty. Please push/commit files to initialize the repository first.'
+          message:
+            "Cannot create a new branch: the repository is empty. Please push/commit files to initialize the repository first.",
         });
       }
       throw err;
     }
 
-    const cleanBranchName = branchName.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._/-]/g, '');
+    const cleanBranchName = branchName
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9._/-]/g, "");
     await octokit.git.createRef({
       owner,
       repo,
       ref: `refs/heads/${cleanBranchName}`,
-      sha: sourceSha
+      sha: sourceSha,
     });
 
     res.status(201).json({
       success: true,
       message: `Branch "${cleanBranchName}" created successfully from "${sourceBranch}".`,
-      branchName: cleanBranchName
+      branchName: cleanBranchName,
     });
   } catch (err) {
     if (err.status === 422) {
       return res.status(422).json({
-        message: 'A branch with this name may already exist in GitHub.'
+        message: "A branch with this name may already exist in GitHub.",
       });
     }
     next(err);
@@ -244,10 +281,10 @@ export async function createBranch(req, res, next) {
 export async function compareUpload(req, res, next) {
   try {
     const { owner, repo } = req.params;
-    const { branch, includeDeletions = 'false' } = req.body;
+    const { branch, includeDeletions = "false" } = req.body;
 
     if (!branch) {
-      return res.status(400).json({ message: 'Branch is required' });
+      return res.status(400).json({ message: "Branch is required" });
     }
 
     const octokit = new Octokit({ auth: req.session.githubAccessToken });
@@ -258,13 +295,17 @@ export async function compareUpload(req, res, next) {
       try {
         relativePaths = JSON.parse(req.body.paths);
       } catch (e) {
-        console.warn('Failed to parse paths JSON', e);
+        console.warn("Failed to parse paths JSON", e);
       }
     }
 
     const maxFiles = 500;
     if (uploadedFiles.length > maxFiles) {
-      return res.status(400).json({ message: `Max upload limit exceeded (Max: ${maxFiles} files)` });
+      return res
+        .status(400)
+        .json({
+          message: `Max upload limit exceeded (Max: ${maxFiles} files)`,
+        });
     }
 
     const validUploadedFiles = [];
@@ -281,8 +322,8 @@ export async function compareUpload(req, res, next) {
 
       validUploadedFiles.push({
         file,
-        path: relPath.replace(/\\/g, '/'),
-        sha: calculateGitSha(file.buffer)
+        path: relPath.replace(/\\/g, "/"),
+        sha: calculateGitSha(file.buffer),
       });
     }
 
@@ -297,14 +338,14 @@ export async function compareUpload(req, res, next) {
       const refRes = await octokit.git.getRef({
         owner,
         repo,
-        ref: `heads/${branch}`
+        ref: `heads/${branch}`,
       });
       latestCommitSha = refRes.data.object.sha;
 
       const commitRes = await octokit.git.getCommit({
         owner,
         repo,
-        commit_sha: latestCommitSha
+        commit_sha: latestCommitSha,
       });
       const treeSha = commitRes.data.tree.sha;
 
@@ -312,17 +353,20 @@ export async function compareUpload(req, res, next) {
         owner,
         repo,
         tree_sha: treeSha,
-        recursive: '1'
+        recursive: "1",
       });
 
       for (const node of treeRes.data.tree) {
-        if (node.type === 'blob') {
+        if (node.type === "blob") {
           remoteFilesMap.set(node.path, node.sha);
           remotePaths.add(node.path);
         }
       }
     } catch (err) {
-      console.warn(`[compare] Could not fetch remote tree (status: ${err.status}), treating remote as empty:`, err.message);
+      console.warn(
+        `[compare] Could not fetch remote tree (status: ${err.status}), treating remote as empty:`,
+        err.message,
+      );
     }
 
     const added = [];
@@ -360,13 +404,12 @@ export async function compareUpload(req, res, next) {
       summary: {
         added,
         modified,
-        deleted: includeDeletions === 'true' ? deleted : [],
+        deleted: includeDeletions === "true" ? deleted : [],
         unchangedCount: unchanged.length,
         ignoredCount,
-        renamedTo
-      }
+        renamedTo,
+      },
     });
-
   } catch (err) {
     next(err);
   }
@@ -376,23 +419,36 @@ export async function compareUpload(req, res, next) {
 export async function commitUpload(req, res, next) {
   try {
     const { owner, repo } = req.params;
-    const { branch, commitMessage, includeDeletions = 'false', socketId } = req.body;
+    const {
+      branch,
+      commitMessage,
+      includeDeletions = "false",
+      socketId,
+    } = req.body;
 
-    const emitLog = (message, type = 'info') => {
+    const emitLog = (message, type = "info") => {
       if (socketId) {
         try {
-          getIo().to(socketId).emit('upload_progress', { message, type, timestamp: new Date().toISOString() });
+          getIo()
+            .to(socketId)
+            .emit("upload_progress", {
+              message,
+              type,
+              timestamp: new Date().toISOString(),
+            });
         } catch (e) {
-          console.warn('Socket error:', e);
+          console.warn("Socket error:", e);
         }
       }
     };
 
     if (!branch) {
-      return res.status(400).json({ message: 'Branch is required' });
+      return res.status(400).json({ message: "Branch is required" });
     }
 
-    emitLog(`Starting upload process for repository: ${owner}/${repo} on branch ${branch}...`);
+    emitLog(
+      `Starting upload process for repository: ${owner}/${repo} on branch ${branch}...`,
+    );
 
     const octokit = new Octokit({ auth: req.session.githubAccessToken });
     const uploadedFiles = req.files || [];
@@ -402,13 +458,17 @@ export async function commitUpload(req, res, next) {
       try {
         relativePaths = JSON.parse(req.body.paths);
       } catch (e) {
-        console.warn('Failed to parse paths JSON', e);
+        console.warn("Failed to parse paths JSON", e);
       }
     }
 
     const maxFiles = 500;
     if (uploadedFiles.length > maxFiles) {
-      return res.status(400).json({ message: `Max upload limit exceeded (Max: ${maxFiles} files)` });
+      return res
+        .status(400)
+        .json({
+          message: `Max upload limit exceeded (Max: ${maxFiles} files)`,
+        });
     }
 
     const validUploadedFiles = [];
@@ -425,15 +485,17 @@ export async function commitUpload(req, res, next) {
 
       validUploadedFiles.push({
         file,
-        path: relPath.replace(/\\/g, '/'),
-        sha: calculateGitSha(file.buffer)
+        path: relPath.replace(/\\/g, "/"),
+        sha: calculateGitSha(file.buffer),
       });
     }
 
     const flutterAppName = req.body.flutterAppName;
     const renamedTo = processFlutterRenames(validUploadedFiles, flutterAppName);
 
-    emitLog(`Processed ${validUploadedFiles.length} files (Ignored ${ignoredCount} invalid/system files). Fetching latest branch state...`);
+    emitLog(
+      `Processed ${validUploadedFiles.length} files (Ignored ${ignoredCount} invalid/system files). Fetching latest branch state...`,
+    );
 
     let latestCommitSha = null;
     let isInitialCommit = false;
@@ -442,7 +504,7 @@ export async function commitUpload(req, res, next) {
       const refRes = await octokit.git.getRef({
         owner,
         repo,
-        ref: `heads/${branch}`
+        ref: `heads/${branch}`,
       });
       latestCommitSha = refRes.data.object.sha;
 
@@ -450,10 +512,13 @@ export async function commitUpload(req, res, next) {
       await octokit.git.getCommit({
         owner,
         repo,
-        commit_sha: latestCommitSha
+        commit_sha: latestCommitSha,
       });
     } catch (err) {
-      console.warn(`[commit] Branch ref or commit not resolvable (status: ${err.status}), setting isInitialCommit = true:`, err.message);
+      console.warn(
+        `[commit] Branch ref or commit not resolvable (status: ${err.status}), setting isInitialCommit = true:`,
+        err.message,
+      );
       isInitialCommit = true;
     }
 
@@ -462,7 +527,7 @@ export async function commitUpload(req, res, next) {
       const commitRes = await octokit.git.getCommit({
         owner,
         repo,
-        commit_sha: latestCommitSha
+        commit_sha: latestCommitSha,
       });
       const latestTreeSha = commitRes.data.tree.sha;
 
@@ -470,13 +535,15 @@ export async function commitUpload(req, res, next) {
         owner,
         repo,
         tree_sha: latestTreeSha,
-        recursive: '1'
+        recursive: "1",
       });
 
-      remoteBlobs = treeRes.data.tree.filter((node) => node.type === 'blob');
+      remoteBlobs = treeRes.data.tree.filter((node) => node.type === "blob");
     }
 
-    const remoteFilesMap = new Map(remoteBlobs.map((node) => [node.path, node]));
+    const remoteFilesMap = new Map(
+      remoteBlobs.map((node) => [node.path, node]),
+    );
 
     const addedPaths = [];
     const modifiedPaths = [];
@@ -489,7 +556,7 @@ export async function commitUpload(req, res, next) {
       try {
         selectedPaths = new Set(JSON.parse(req.body.selectedPaths));
       } catch (e) {
-        console.warn('Failed to parse selectedPaths JSON', e);
+        console.warn("Failed to parse selectedPaths JSON", e);
       }
     }
 
@@ -524,22 +591,36 @@ export async function commitUpload(req, res, next) {
       }
     }
 
-    const actuallyDeleting = includeDeletions === 'true';
-    if (filesToUpload.length === 0 && (!actuallyDeleting || deletedPaths.length === 0 || (selectedPaths && !deletedPaths.some(p => selectedPaths.has(p))))) {
+    const actuallyDeleting = includeDeletions === "true";
+    if (
+      filesToUpload.length === 0 &&
+      (!actuallyDeleting ||
+        deletedPaths.length === 0 ||
+        (selectedPaths && !deletedPaths.some((p) => selectedPaths.has(p))))
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'No changes detected. Uploaded files are identical to the remote branch files.'
+        message:
+          "No changes detected. Uploaded files are identical to the remote branch files.",
       });
     }
 
-    emitLog(`Analyzing differences. Found ${filesToUpload.length} file(s) that need uploading.`);
+    emitLog(
+      `Analyzing differences. Found ${filesToUpload.length} file(s) that need uploading.`,
+    );
 
     let completedBlobs = 0;
     const totalBlobs = filesToUpload.length;
 
     if (totalBlobs > 0 && socketId) {
       try {
-        getIo().to(socketId).emit('upload_progress_percent', { completed: 0, total: totalBlobs, percentage: 0 });
+        getIo()
+          .to(socketId)
+          .emit("upload_progress_percent", {
+            completed: 0,
+            total: totalBlobs,
+            percentage: 0,
+          });
       } catch (e) {}
     }
 
@@ -548,26 +629,28 @@ export async function commitUpload(req, res, next) {
       const blobRes = await octokit.git.createBlob({
         owner,
         repo,
-        content: item.file.buffer.toString('base64'),
-        encoding: 'base64'
+        content: item.file.buffer.toString("base64"),
+        encoding: "base64",
       });
-      
+
       completedBlobs++;
       if (socketId) {
         try {
-          getIo().to(socketId).emit('upload_progress_percent', { 
-            completed: completedBlobs, 
-            total: totalBlobs,
-            percentage: Math.round((completedBlobs / totalBlobs) * 100)
-          });
+          getIo()
+            .to(socketId)
+            .emit("upload_progress_percent", {
+              completed: completedBlobs,
+              total: totalBlobs,
+              percentage: Math.round((completedBlobs / totalBlobs) * 100),
+            });
         } catch (e) {
-          console.warn('Socket error:', e);
+          console.warn("Socket error:", e);
         }
       }
 
       return {
         path: item.path,
-        sha: blobRes.data.sha
+        sha: blobRes.data.sha,
       };
     });
 
@@ -581,7 +664,9 @@ export async function commitUpload(req, res, next) {
       const path = remoteBlob.path;
 
       if (actuallyDeleting && deletedPaths.includes(path)) {
-        const isDeletionSelected = selectedPaths ? selectedPaths.has(path) : true;
+        const isDeletionSelected = selectedPaths
+          ? selectedPaths.has(path)
+          : true;
         if (isDeletionSelected) {
           continue;
         }
@@ -595,7 +680,7 @@ export async function commitUpload(req, res, next) {
         path: remoteBlob.path,
         mode: remoteBlob.mode,
         type: remoteBlob.type,
-        sha: remoteBlob.sha
+        sha: remoteBlob.sha,
       });
     }
 
@@ -603,9 +688,9 @@ export async function commitUpload(req, res, next) {
     for (const blob of newBlobs) {
       finalTreeNodes.push({
         path: blob.path,
-        mode: '100644',
-        type: 'blob',
-        sha: blob.sha
+        mode: "100644",
+        type: "blob",
+        sha: blob.sha,
       });
     }
 
@@ -613,7 +698,7 @@ export async function commitUpload(req, res, next) {
     const newTreeRes = await octokit.git.createTree({
       owner,
       repo,
-      tree: finalTreeNodes
+      tree: finalTreeNodes,
     });
     const newTreeSha = newTreeRes.data.sha;
 
@@ -621,8 +706,8 @@ export async function commitUpload(req, res, next) {
     const commitParams = {
       owner,
       repo,
-      message: commitMessage || 'Upload project files from dashboard',
-      tree: newTreeSha
+      message: commitMessage || "Upload project files from dashboard",
+      tree: newTreeSha,
     };
     if (!isInitialCommit) {
       commitParams.parents = [latestCommitSha];
@@ -637,22 +722,22 @@ export async function commitUpload(req, res, next) {
         owner,
         repo,
         ref: `refs/heads/${branch}`,
-        sha: newCommitSha
+        sha: newCommitSha,
       });
     } else {
       await octokit.git.updateRef({
         owner,
         repo,
         ref: `heads/${branch}`,
-        sha: newCommitSha
+        sha: newCommitSha,
       });
     }
 
-    emitLog(`Upload process completed successfully!`, 'success');
+    emitLog(`Upload process completed successfully!`, "success");
 
     res.json({
       success: true,
-      message: 'Changes pushed successfully',
+      message: "Changes pushed successfully",
       commitSha: newCommitSha,
       commitUrl: `https://github.com/${owner}/${repo}/commit/${newCommitSha}`,
       branchUrl: `https://github.com/${owner}/${repo}/tree/${branch}`,
@@ -662,10 +747,9 @@ export async function commitUpload(req, res, next) {
         deleted: actuallyDeleting ? deletedPaths.length : 0,
         unchanged: unchangedPaths.length,
         ignored: ignoredCount,
-        renamedTo
-      }
+        renamedTo,
+      },
     });
-
   } catch (err) {
     next(err);
   }
@@ -675,93 +759,173 @@ export async function commitUpload(req, res, next) {
 export async function updateFlutterApp(req, res, next) {
   try {
     const { owner, repo } = req.params;
-    const { branch = 'main', newName, commitMessage } = req.body;
+    const { branch = "main", newName, commitMessage } = req.body;
     const file = req.file;
 
-    if (!branch) return res.status(400).json({ message: 'Branch is required' });
-    if (!newName && !file) return res.status(400).json({ message: 'Either newName or app icon is required' });
+    if (!branch) return res.status(400).json({ message: "Branch is required" });
+    if (!newName && !file)
+      return res
+        .status(400)
+        .json({ message: "Either newName or app icon is required" });
 
     const octokit = new Octokit({ auth: req.session.githubAccessToken });
     const io = getIo();
-    const emitLog = (msg) => io.emit('upload_log', { repoFullName: `${owner}/${repo}`, message: msg });
-    const emitProgress = (progress, statusText) => io.emit('upload_progress', { repoFullName: `${owner}/${repo}`, progress, status: statusText });
+    const emitLog = (msg) =>
+      io.emit("upload_log", { repoFullName: `${owner}/${repo}`, message: msg });
+    const emitProgress = (progress, statusText) =>
+      io.emit("upload_progress", {
+        repoFullName: `${owner}/${repo}`,
+        progress,
+        status: statusText,
+      });
 
     const finalTreeNodes = [];
     let cleanAppName = null;
 
     if (newName) {
-      cleanAppName = newName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
-      if (!cleanAppName) return res.status(400).json({ message: 'Invalid Flutter App Name' });
+      cleanAppName = newName
+        .trim()
+        .replace(/\s+/g, "_")
+        .replace(/[^a-zA-Z0-9._-]/g, "");
+      if (!cleanAppName)
+        return res.status(400).json({ message: "Invalid Flutter App Name" });
     }
 
-    emitLog('Fetching current branch state...');
-    const refRes = await octokit.git.getRef({ owner, repo, ref: `heads/${branch}` });
+    emitLog("Fetching current branch state...");
+    const refRes = await octokit.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+    });
     const latestCommitSha = refRes.data.object.sha;
 
-    const commitRes = await octokit.git.getCommit({ owner, repo, commit_sha: latestCommitSha });
+    const commitRes = await octokit.git.getCommit({
+      owner,
+      repo,
+      commit_sha: latestCommitSha,
+    });
     const baseTreeSha = commitRes.data.tree.sha;
 
     if (cleanAppName) {
-      emitLog('Fetching remote file tree to rename app...');
-      const treeRes = await octokit.git.getTree({ owner, repo, tree_sha: baseTreeSha, recursive: '1' });
+      emitLog("Fetching remote file tree to rename app...");
+      const treeRes = await octokit.git.getTree({
+        owner,
+        repo,
+        tree_sha: baseTreeSha,
+        recursive: "1",
+      });
       let updatedFilesCount = 0;
       for (const node of treeRes.data.tree) {
-        if (node.type === 'blob') {
+        if (node.type === "blob") {
           const pathLower = node.path.toLowerCase();
-          const isAppInfo = pathLower.endsWith('macos/runner/configs/appinfo.xcconfig');
-          const isManifest = pathLower.endsWith('android/app/src/main/androidmanifest.xml');
-          
+          const isAppInfo = pathLower.endsWith(
+            "macos/runner/configs/appinfo.xcconfig",
+          );
+          const isManifest = pathLower.endsWith(
+            "android/app/src/main/androidmanifest.xml",
+          );
+
           if (isAppInfo || isManifest) {
-            const blobRes = await octokit.git.getBlob({ owner, repo, file_sha: node.sha });
-            let content = Buffer.from(blobRes.data.content, blobRes.data.encoding).toString('utf8');
-            if (isAppInfo) content = content.replace(/PRODUCT_NAME\s*=\s*[a-zA-Z0-9._-]+/g, `PRODUCT_NAME = ${cleanAppName}`);
-            else if (isManifest) content = content.replace(/android:label="[^"]*"/g, `android:label="${cleanAppName}"`);
+            const blobRes = await octokit.git.getBlob({
+              owner,
+              repo,
+              file_sha: node.sha,
+            });
+            let content = Buffer.from(
+              blobRes.data.content,
+              blobRes.data.encoding,
+            ).toString("utf8");
+            if (isAppInfo)
+              content = content.replace(
+                /PRODUCT_NAME\s*=\s*[a-zA-Z0-9._-]+/g,
+                `PRODUCT_NAME = ${cleanAppName}`,
+              );
+            else if (isManifest)
+              content = content.replace(
+                /android:label="[^"]*"/g,
+                `android:label="${cleanAppName}"`,
+              );
 
             const newBlobRes = await octokit.git.createBlob({
-              owner, repo, content: Buffer.from(content, 'utf8').toString('base64'), encoding: 'base64'
+              owner,
+              repo,
+              content: Buffer.from(content, "utf8").toString("base64"),
+              encoding: "base64",
             });
-            finalTreeNodes.push({ path: node.path, mode: node.mode, type: 'blob', sha: newBlobRes.data.sha });
+            finalTreeNodes.push({
+              path: node.path,
+              mode: node.mode,
+              type: "blob",
+              sha: newBlobRes.data.sha,
+            });
             updatedFilesCount++;
             emitLog(`Modified in-memory remote blob for ${node.path}`);
           }
         }
       }
       if (updatedFilesCount === 0) {
-         emitLog(`Warning: No Flutter configuration files found to rename on the remote branch.`);
+        emitLog(
+          `Warning: No Flutter configuration files found to rename on the remote branch.`,
+        );
       }
     }
 
     if (file) {
-      emitLog('Generating and uploading app icons...');
-      const iconBlobs = await generateAndCommitAppIcons({ owner, repo, branch, fileBuffer: file.buffer, accessToken: req.session.githubAccessToken });
+      emitLog("Generating and uploading app icons...");
+      const iconBlobs = await generateAndCommitAppIcons({
+        owner,
+        repo,
+        branch,
+        fileBuffer: file.buffer,
+        accessToken: req.session.githubAccessToken,
+      });
       finalTreeNodes.push(...iconBlobs);
     }
 
     if (finalTreeNodes.length === 0) {
-      return res.status(400).json({ message: 'No changes were generated.' });
+      return res.status(400).json({ message: "No changes were generated." });
     }
 
-    emitLog('Creating commit tree...');
-    const newTreeRes = await octokit.git.createTree({ owner, repo, base_tree: baseTreeSha, tree: finalTreeNodes });
-    
-    emitLog('Finalizing commit...');
+    emitLog("Creating commit tree...");
+    const newTreeRes = await octokit.git.createTree({
+      owner,
+      repo,
+      base_tree: baseTreeSha,
+      tree: finalTreeNodes,
+    });
+
+    emitLog("Finalizing commit...");
     let autoMsg = [];
     if (cleanAppName) autoMsg.push(`Rename App to ${cleanAppName}`);
     if (file) autoMsg.push(`Update App Icons`);
-    const finalCommitMessage = commitMessage || autoMsg.join(' & ') + ` - ${new Date().toLocaleString()}`;
+    const finalCommitMessage =
+      commitMessage ||
+      autoMsg.join(" & ") + ` - ${new Date().toLocaleString()}`;
 
     const newCommitRes = await octokit.git.createCommit({
-      owner, repo, message: finalCommitMessage, tree: newTreeRes.data.sha, parents: [latestCommitSha]
+      owner,
+      repo,
+      message: finalCommitMessage,
+      tree: newTreeRes.data.sha,
+      parents: [latestCommitSha],
     });
 
-    emitLog('Updating branch reference...');
-    await octokit.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommitRes.data.sha });
+    emitLog("Updating branch reference...");
+    await octokit.git.updateRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+      sha: newCommitRes.data.sha,
+    });
 
-    emitLog('App settings successfully updated!');
-    emitProgress(100, 'Done');
-    
-    res.json({ success: true, message: 'App successfully updated.', commitSha: newCommitRes.data.sha });
+    emitLog("App settings successfully updated!");
+    emitProgress(100, "Done");
 
+    res.json({
+      success: true,
+      message: "App successfully updated.",
+      commitSha: newCommitRes.data.sha,
+    });
   } catch (err) {
     next(err);
   }
@@ -772,15 +936,15 @@ export async function getForkFamilies(req, res, next) {
   try {
     const accessToken = req.session.githubAccessToken;
     if (!accessToken) {
-      return res.status(401).json({ message: 'GitHub login required.' });
+      return res.status(401).json({ message: "GitHub login required." });
     }
 
     const octokit = new Octokit({ auth: accessToken });
 
     // Fetch up to 100 repositories accessible to the user
     const { data: repos } = await octokit.repos.listForAuthenticatedUser({
-      sort: 'updated',
-      per_page: 100
+      sort: "updated",
+      per_page: 100,
     });
 
     // Filter repos where repo.fork === true
@@ -796,14 +960,17 @@ export async function getForkFamilies(req, res, next) {
         try {
           const { data: detail } = await octokit.repos.get({
             owner: fork.owner.login,
-            repo: fork.name
+            repo: fork.name,
           });
           return detail;
         } catch (err) {
-          console.warn(`[fork-families] Failed to fetch details for ${fork.owner.login}/${fork.name}:`, err.message);
+          console.warn(
+            `[fork-families] Failed to fetch details for ${fork.owner.login}/${fork.name}:`,
+            err.message,
+          );
           return null;
         }
-      })
+      }),
     );
 
     const validForks = forkDetails.filter(Boolean);
@@ -821,10 +988,10 @@ export async function getForkFamilies(req, res, next) {
             owner: fork.parent.owner.login,
             repo: fork.parent.name,
             fullName: parentFullName,
-            defaultBranch: fork.parent.default_branch || 'main',
-            htmlUrl: fork.parent.html_url
+            defaultBranch: fork.parent.default_branch || "main",
+            htmlUrl: fork.parent.html_url,
           },
-          forks: []
+          forks: [],
         };
       }
 
@@ -844,18 +1011,18 @@ export async function getForkFamilies(req, res, next) {
         ahead: 0,
         behind: 0,
         diverged: 0,
-        unknown: 0
+        unknown: 0,
       };
 
       const mappedForks = await Promise.all(
         group.forks.map(async (fork) => {
           const forkOwner = fork.owner.login;
           const forkRepo = fork.name;
-          const forkBranch = fork.default_branch || 'main';
+          const forkBranch = fork.default_branch || "main";
           const parentOwner = parent.owner;
           const parentBranch = parent.defaultBranch;
 
-          let status = 'unknown';
+          let status = "unknown";
           let aheadBy = 0;
           let behindBy = 0;
           let changedFilesCount = 0;
@@ -867,7 +1034,7 @@ export async function getForkFamilies(req, res, next) {
               owner: forkOwner,
               repo: forkRepo,
               base: `${parentOwner}:${parentBranch}`,
-              head: `${forkOwner}:${forkBranch}`
+              head: `${forkOwner}:${forkBranch}`,
             });
 
             aheadBy = comparison.ahead_by || 0;
@@ -875,17 +1042,20 @@ export async function getForkFamilies(req, res, next) {
             changedFilesCount = comparison.files ? comparison.files.length : 0;
 
             if (aheadBy > 0 && behindBy > 0) {
-              status = 'diverged';
+              status = "diverged";
             } else if (aheadBy > 0) {
-              status = 'ahead';
+              status = "ahead";
             } else if (behindBy > 0) {
-              status = 'behind';
+              status = "behind";
             } else if (aheadBy === 0 && behindBy === 0) {
-              status = 'same';
+              status = "same";
             }
           } catch (err) {
-            console.warn(`[fork-families] Comparison failed for ${forkOwner}/${forkRepo} against parent ${parentOwner}/${parent.repo}:`, err.message);
-            status = 'unknown';
+            console.warn(
+              `[fork-families] Comparison failed for ${forkOwner}/${forkRepo} against parent ${parentOwner}/${parent.repo}:`,
+              err.message,
+            );
+            status = "unknown";
           }
 
           if (summary[status] !== undefined) {
@@ -905,15 +1075,15 @@ export async function getForkFamilies(req, res, next) {
             behindBy,
             hasUserChanges: aheadBy > 0,
             needsParentUpdate: behindBy > 0,
-            changedFilesCount
+            changedFilesCount,
           };
-        })
+        }),
       );
 
       results.push({
         parent,
         summary,
-        forks: mappedForks
+        forks: mappedForks,
       });
     }
 
@@ -926,14 +1096,30 @@ export async function getForkFamilies(req, res, next) {
 // 7. Compare a specific parent branch with a fork branch
 export async function compareForkBranch(req, res, next) {
   try {
-    const { parentOwner, parentRepo, parentBranch, forkOwner, forkRepo, forkBranch } = req.query;
+    const {
+      parentOwner,
+      parentRepo,
+      parentBranch,
+      forkOwner,
+      forkRepo,
+      forkBranch,
+    } = req.query;
     const accessToken = req.session.githubAccessToken;
     if (!accessToken) {
-      return res.status(401).json({ message: 'GitHub login required.' });
+      return res.status(401).json({ message: "GitHub login required." });
     }
 
-    if (!parentOwner || !parentRepo || !parentBranch || !forkOwner || !forkRepo || !forkBranch) {
-      return res.status(400).json({ message: 'Missing comparison parameters.' });
+    if (
+      !parentOwner ||
+      !parentRepo ||
+      !parentBranch ||
+      !forkOwner ||
+      !forkRepo ||
+      !forkBranch
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Missing comparison parameters." });
     }
 
     const octokit = new Octokit({ auth: accessToken });
@@ -941,29 +1127,29 @@ export async function compareForkBranch(req, res, next) {
       owner: forkOwner,
       repo: forkRepo,
       base: `${parentOwner}:${parentBranch}`,
-      head: `${forkOwner}:${forkBranch}`
+      head: `${forkOwner}:${forkBranch}`,
     });
 
     const aheadBy = comparison.ahead_by || 0;
     const behindBy = comparison.behind_by || 0;
     const changedFilesCount = comparison.files ? comparison.files.length : 0;
 
-    let status = 'unknown';
+    let status = "unknown";
     if (aheadBy > 0 && behindBy > 0) {
-      status = 'diverged';
+      status = "diverged";
     } else if (aheadBy > 0) {
-      status = 'ahead';
+      status = "ahead";
     } else if (behindBy > 0) {
-      status = 'behind';
+      status = "behind";
     } else if (aheadBy === 0 && behindBy === 0) {
-      status = 'same';
+      status = "same";
     }
 
     res.json({
       status,
       aheadBy,
       behindBy,
-      changedFilesCount
+      changedFilesCount,
     });
   } catch (err) {
     next(err);
@@ -973,14 +1159,28 @@ export async function compareForkBranch(req, res, next) {
 // 8. Merge parent changes into fork branch
 export async function mergeForkBranch(req, res, next) {
   try {
-    const { parentOwner, parentRepo, parentBranch, forkOwner, forkRepo, forkBranch } = req.body;
+    const {
+      parentOwner,
+      parentRepo,
+      parentBranch,
+      forkOwner,
+      forkRepo,
+      forkBranch,
+    } = req.body;
     const accessToken = req.session.githubAccessToken;
     if (!accessToken) {
-      return res.status(401).json({ message: 'GitHub login required.' });
+      return res.status(401).json({ message: "GitHub login required." });
     }
 
-    if (!parentOwner || !parentRepo || !parentBranch || !forkOwner || !forkRepo || !forkBranch) {
-      return res.status(400).json({ message: 'Missing merge parameters.' });
+    if (
+      !parentOwner ||
+      !parentRepo ||
+      !parentBranch ||
+      !forkOwner ||
+      !forkRepo ||
+      !forkBranch
+    ) {
+      return res.status(400).json({ message: "Missing merge parameters." });
     }
 
     const octokit = new Octokit({ auth: accessToken });
@@ -990,7 +1190,7 @@ export async function mergeForkBranch(req, res, next) {
       const { data: parentBranchData } = await octokit.repos.getBranch({
         owner: parentOwner,
         repo: parentRepo,
-        branch: parentBranch
+        branch: parentBranch,
       });
       const parentCommitSha = parentBranchData.commit.sha;
 
@@ -1000,24 +1200,25 @@ export async function mergeForkBranch(req, res, next) {
         repo: forkRepo,
         base: forkBranch,
         head: parentCommitSha,
-        commit_message: `Sync: Merge parent ${parentOwner}/${parentRepo}:${parentBranch} (${parentCommitSha}) into ${forkBranch}`
+        commit_message: `Sync: Merge parent ${parentOwner}/${parentRepo}:${parentBranch} (${parentCommitSha}) into ${forkBranch}`,
       });
 
       res.json({
         success: true,
-        message: 'Successfully merged parent changes into fork branch.',
-        data: response.data
+        message: "Successfully merged parent changes into fork branch.",
+        data: response.data,
       });
     } catch (mergeErr) {
       if (mergeErr.status === 409) {
         return res.status(409).json({
-          message: 'Conflict detected during merge. You must resolve conflicts manually on GitHub.'
+          message:
+            "Conflict detected during merge. You must resolve conflicts manually on GitHub.",
         });
       }
       if (mergeErr.status === 204) {
         return res.json({
           success: true,
-          message: 'Branch is already up to date with parent.'
+          message: "Branch is already up to date with parent.",
         });
       }
       throw mergeErr;

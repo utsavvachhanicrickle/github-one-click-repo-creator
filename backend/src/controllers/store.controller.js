@@ -2,7 +2,10 @@ import { z } from "zod";
 import authValidations from "../validations/auth.validation.js";
 import { User } from "../models/user.module.js";
 import { Store } from "../models/store.module.js";
-import { createRepoWithFiles, getAutomationTemplateFiles } from "../services/githubRepo.service.js";
+import {
+  createRepoWithFiles,
+  getAutomationTemplateFiles,
+} from "../services/githubRepo.service.js";
 
 const createRepoSchema = z.object({
   repoName: z
@@ -43,7 +46,7 @@ export async function createStoreRepoController(req, res, next) {
 
     const description = `created this repository using github one-click repo creator by the help of ${user.unique_id}`;
 
-    // Fetch the files from the github_automation template
+    // Fetch the files from the flutter_demo template
     const templateFiles = await getAutomationTemplateFiles();
 
     const result = await createRepoWithFiles({

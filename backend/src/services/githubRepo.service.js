@@ -1,29 +1,40 @@
-import { Octokit } from '@octokit/rest';
-import axios from 'axios';
+import { Octokit } from "@octokit/rest";
+import axios from "axios";
 
 function toBase64(content) {
-  if (Buffer.isBuffer(content)) return content.toString('base64');
-  return Buffer.from(content, 'utf8').toString('base64');
+  if (Buffer.isBuffer(content)) return content.toString("base64");
+  return Buffer.from(content, "utf8").toString("base64");
 }
 
 export async function getAutomationTemplateFiles() {
-  const treeRes = await axios.get('https://api.github.com/repos/utsavvachhanicrickle/github_automation/git/trees/main?recursive=1');
-  const blobs = treeRes.data.tree.filter(node => node.type === 'blob');
+  const treeRes = await axios.get(
+    "https://api.github.com/repos/utsavvachhanicrickle/flutter_demo/git/trees/main?recursive=1",
+  );
+  const blobs = treeRes.data.tree.filter((node) => node.type === "blob");
 
   const filePromises = blobs.map(async (blob) => {
-    const rawRes = await axios.get(`https://raw.githubusercontent.com/utsavvachhanicrickle/github_automation/main/${blob.path}`, {
-      responseType: 'arraybuffer'
-    });
+    const rawRes = await axios.get(
+      `https://raw.githubusercontent.com/utsavvachhanicrickle/flutter_demo/main/${blob.path}`,
+      {
+        responseType: "arraybuffer",
+      },
+    );
     return {
       path: blob.path,
-      content: Buffer.from(rawRes.data)
+      content: Buffer.from(rawRes.data),
     };
   });
 
   return await Promise.all(filePromises);
 }
 
-export async function createRepoWithFiles({ accessToken, repoName, description, isPrivate, files }) {
+export async function createRepoWithFiles({
+  accessToken,
+  repoName,
+  description,
+  isPrivate,
+  files,
+}) {
   const octokit = new Octokit({ auth: accessToken });
 
   const { data: user } = await octokit.users.getAuthenticated();
@@ -34,9 +45,9 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
   if (!Array.isArray(activeFiles) || activeFiles.length === 0) {
     activeFiles = [
       {
-        path: 'README.md',
-        content: `# ${repoName}\n\n${description || 'A new GitHub repository created using RepoSync.'}\n\n---\n*Created automatically with [RepoSync](https://github.com/utsavvachhanicrickle/github-one-click-repo-creator).*`
-      }
+        path: "README.md",
+        content: `# ${repoName}\n\n${description || "A new GitHub repository created using RepoSync."}\n\n---\n*Created automatically with [RepoSync](https://github.com/utsavvachhanicrickle/github-one-click-repo-creator).*`,
+      },
     ];
   }
 
@@ -50,19 +61,19 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
     auto_init: true,
     has_issues: true,
     has_projects: false,
-    has_wiki: false
+    has_wiki: false,
   });
 
   // Wait a short moment for the repository database to be provisioned and ready on GitHub.
   await new Promise((resolve) => setTimeout(resolve, 1500));
 
-  const defaultBranch = repo.default_branch || 'main';
+  const defaultBranch = repo.default_branch || "main";
 
   // Get the latest commit SHA of the default branch
   const { data: ref } = await octokit.git.getRef({
     owner,
     repo: repoName,
-    ref: `heads/${defaultBranch}`
+    ref: `heads/${defaultBranch}`,
   });
   const baseCommitSha = ref.object.sha;
 
@@ -70,7 +81,7 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
   const { data: baseCommit } = await octokit.git.getCommit({
     owner,
     repo: repoName,
-    commit_sha: baseCommitSha
+    commit_sha: baseCommitSha,
   });
   const baseTreeSha = baseCommit.tree.sha;
 
@@ -82,14 +93,14 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
       owner,
       repo: repoName,
       content: toBase64(file.content),
-      encoding: 'base64'
+      encoding: "base64",
     });
 
     treeItems.push({
       path: file.path,
-      mode: '100644',
-      type: 'blob',
-      sha: blob.sha
+      mode: "100644",
+      type: "blob",
+      sha: blob.sha,
     });
   }
 
@@ -98,7 +109,7 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
     owner,
     repo: repoName,
     tree: treeItems,
-    base_tree: baseTreeSha
+    base_tree: baseTreeSha,
   });
 
   // Create commit with base commit as parent
@@ -107,7 +118,7 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
     repo: repoName,
     message: `Initial website generated from builder - ${Date.now()}`,
     tree: tree.sha,
-    parents: [baseCommitSha]
+    parents: [baseCommitSha],
   });
 
   // Update default branch reference to point to our new commit
@@ -116,7 +127,7 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
     repo: repoName,
     ref: `heads/${defaultBranch}`,
     sha: commit.sha,
-    force: true
+    force: true,
   });
 
   return {
@@ -125,6 +136,6 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
     htmlUrl: repo.html_url,
     cloneUrl: repo.clone_url,
     defaultBranch,
-    commitSha: commit.sha
+    commitSha: commit.sha,
   };
 }
