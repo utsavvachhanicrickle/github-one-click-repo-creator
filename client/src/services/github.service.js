@@ -69,3 +69,14 @@ export async function getUserRepositories() {
   const res = await API.get('/api/github/user-repositories');
   return res.data;
 }
+
+export const updateFlutterApp = async (owner, repo, branch, newName, iconFile) => {
+  const formData = new FormData();
+  formData.append('branch', branch);
+  if (newName) formData.append('newName', newName);
+  if (iconFile) formData.append('icon', iconFile);
+
+  const res = await API.post(`/api/github/repos/${owner}/${repo}/update-flutter-app`, formData);
+
+  return res.data;
+};

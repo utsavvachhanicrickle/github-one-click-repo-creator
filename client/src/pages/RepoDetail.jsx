@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Github, GitBranch, ShieldAlert, CheckCircle2, ExternalLink, Plus, X, Rocket } from 'lucide-react';
-import Navbar from '../components/Navbar.jsx';
-import BranchSelector from '../components/BranchSelector.jsx';
+import { ArrowLeft, Loader2, Github, ShieldAlert, CheckCircle2, X, Plus } from 'lucide-react';
+
 import FolderUpload from '../components/FolderUpload.jsx';
+import BranchSelector from '../components/BranchSelector.jsx';
+import AppUpdater from '../components/AppUpdater.jsx';
 import { io } from 'socket.io-client';
-import { getRepoBranches, commitFolderUpload, createRepoBranch, renameRemoteFlutterApp } from '../services/github.service.js';
+import { getRepoBranches, commitFolderUpload, createRepoBranch } from '../services/github.service.js';
 
 const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -66,23 +67,10 @@ export default function RepoDetail() {
   }, []);
 
   // Active workspace tab state ('upload' | 'flutter-rename')
-  const [activeTab, setActiveTab] = useState('upload');
+  const [activeTab, setActiveTab] = useState('flutter-rename');
 
   // Flutter App Rename State
   const [flutterAppName, setFlutterAppName] = useState('');
-  const [selectedPaths, setSelectedPaths] = useState(new Set());
-
-  const handleTogglePath = (path) => {
-    setSelectedPaths((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  };
 
   // Create Branch States
   const [showNewBranchInput, setShowNewBranchInput] = useState(false);
@@ -114,29 +102,6 @@ export default function RepoDetail() {
       setError(err.message || 'Failed to create new branch.');
     } finally {
       setCreatingBranch(false);
-    }
-  };
-
-  const [renamingRemote, setRenamingRemote] = useState(false);
-
-  const handleRemoteRename = async () => {
-    if (!flutterAppName.trim()) {
-      setError('Please enter a new Flutter application name first.');
-      return;
-    }
-    try {
-      setRenamingRemote(true);
-      setError('');
-      setSuccessResult(null);
-      setComparisonResult(null);
-
-      const result = await renameRemoteFlutterApp(owner, repo, selectedBranch, flutterAppName.trim());
-      setSuccessResult(result);
-      setFlutterAppName('');
-    } catch (err) {
-      setError(err.message || 'Failed to rename remote Flutter application.');
-    } finally {
-      setRenamingRemote(false);
     }
   };
 
@@ -262,66 +227,6 @@ export default function RepoDetail() {
           </div>
         )}
 
-        {/* {successResult && (
-          <div className="p-6 rounded-3xl bg-(--success-bg) border border-(--success-border) text-(--text-primary) mb-8 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 mb-4">
-              <CheckCircle2 className="text-(--success) shrink-0" size={24} />
-              <span className="font-extrabold text-lg">Push Completed Successfully!</span>
-            </div>
-            
-            <div className="space-y-4">
-              <p className="text-sm text-(--text-secondary)">
-                Successfully created one Git commit with all changes and updated the branch.
-              </p>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-2xl bg-(--bg-primary) border border-(--border) text-xs select-none">
-                <div>
-                  <span className="text-(--text-secondary) block mb-1">Files Added</span>
-                  <span className="text-base font-extrabold text-(--success)">+{successResult.summary.added}</span>
-                </div>
-                <div>
-                  <span className="text-(--text-secondary) block mb-1">Files Modified</span>
-                  <span className="text-base font-extrabold text-amber-500">~{successResult.summary.modified}</span>
-                </div>
-                <div>
-                  <span className="text-(--text-secondary) block mb-1">Files Deleted</span>
-                  <span className="text-base font-extrabold text-(--danger)">-{successResult.summary.deleted}</span>
-                </div>
-                <div>
-                  <span className="text-(--text-secondary) block mb-1">Unchanged files</span>
-                  <span className="text-base font-extrabold text-(--text-primary)">{successResult.summary.unchanged}</span>
-                </div>
-              </div>
-
-              {successResult.summary.renamedTo && (
-                <div className="p-4 rounded-2xl bg-(--primary)/10 border border-(--primary)/20 text-xs font-bold text-(--primary) flex items-center gap-2 select-none">
-                  <Rocket size={16} />
-                  <span>Flutter application renamed to: <span className="font-mono text-xs underline bg-(--bg-secondary) px-2 py-0.5 rounded-md text-(--text-primary)">{successResult.summary.renamedTo}</span></span>
-                </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-3 pt-2 select-none">
-                <a
-                  href={successResult.commitUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 bg-(--primary) text-(--text-inverse) hover:bg-(--primary-hover) font-bold py-3.5 rounded-xl transition duration-200 ease-in-out text-xs shadow-xs"
-                >
-                  View Commit <ExternalLink size={14} />
-                </a>
-                <a
-                  href={successResult.branchUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 bg-(--bg-secondary) hover:bg-(--bg-active) text-(--text-primary) font-bold py-3.5 rounded-xl border border-(--border) transition duration-200 ease-in-out text-xs"
-                >
-                  Browse Branch <ExternalLink size={14} />
-                </a>
-              </div>
-            </div>
-          </div>
-        )} */}
-
         <div className="max-w-3xl mx-auto">
           {/* Main Controls */}
           <div className="space-y-6">
@@ -391,7 +296,7 @@ export default function RepoDetail() {
               )} */}
 
               {/* Workspace Tabs */}
-              <div className="flex border-b border-(--border) select-none pt-2">
+              {/* <div className="flex border-b border-(--border) select-none pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -418,9 +323,9 @@ export default function RepoDetail() {
                       : 'border-transparent text-(--text-secondary) hover:text-(--text-primary)'
                   }`}
                 >
-                  Rename Flutter App (Remote)
+                  Flutter App Settings
                 </button>
-              </div>
+              </div> */}
 
               {activeTab === 'upload' ? (
                 <div className="space-y-6 animate-in fade-in duration-200">
@@ -463,37 +368,32 @@ export default function RepoDetail() {
                 </div>
               ) : (
                 <div className="space-y-6 animate-in fade-in duration-200">
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-(--text-primary) select-none">
-                      New Flutter Application Name
-                    </label>
-                    <input
-                      type="text"
-                      value={flutterAppName}
-                      onChange={(e) => setFlutterAppName(e.target.value)}
-                      placeholder="e.g. utsav_vachhani"
-                      disabled={renamingRemote}
-                      className="w-full bg-(--bg-secondary) border border-(--border) rounded-xl px-4 py-3.5 text-xs text-(--text-primary) placeholder-(--text-secondary) focus:outline-none focus:border-(--primary) transition"
-                    />
-                    <p className="text-[10px] text-(--text-secondary) select-none leading-relaxed">
-                      Directly renames the application inside <code className="font-bold text-(--text-primary)">AppInfo.xcconfig</code> and <code className="font-bold text-(--text-primary)">AndroidManifest.xml</code> on the remote branch <code className="font-bold text-(--text-primary)">{selectedBranch}</code> without uploading any local files.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleRemoteRename}
-                    disabled={renamingRemote || !flutterAppName.trim() || branchesLoading}
-                    className="w-full bg-(--accent) hover:bg-(--accent-hover) text-(--text-inverse) font-extrabold py-4 rounded-xl flex items-center justify-center gap-2.5 transition duration-200 ease-in-out active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none shadow-xs cursor-pointer select-none text-sm animate-pulse-slow"
-                  >
-                    {renamingRemote ? (
-                      <>
-                        <Loader2 className="animate-spin" size={18} />
-                        Renaming Remote Flutter App...
-                      </>
-                    ) : (
-                      'Rename Remote Flutter App Only'
-                    )}
-                  </button>
+                  <AppUpdater 
+                    owner={owner} 
+                    repo={repo} 
+                    currentBranch={selectedBranch}
+                    setIsUploading={(val) => {
+                      setUploading(val);
+                      setCommitting(val);
+                      if (val) {
+                        setLogs([]);
+                        setUploadProgress(null);
+                        setSuccessResult(null);
+                        setError('');
+                      }
+                    }}
+                    setUploadStatus={(msg) => setLogs(prev => [...prev, { message: msg, type: 'info', timestamp: new Date().toISOString() }])}
+                    setUploadProgress={(pct) => setUploadProgress({ percentage: pct })}
+                    onComplete={() => {
+                      setUploading(false);
+                      setCommitting(false);
+                      setSuccessResult({
+                        commitUrl: `https://github.com/${owner}/${repo}/commit/HEAD`,
+                        branchUrl: `https://github.com/${owner}/${repo}/tree/${selectedBranch}`,
+                        summary: { added: 0, modified: 0, deleted: 0, unchanged: 0 } // Dummy data just to show success UI
+                      });
+                    }}
+                  />
                 </div>
               )}
             </div>

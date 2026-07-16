@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { Octokit } from '@octokit/rest';
 import crypto from 'crypto';
 import { createRepoWithFiles, getAutomationTemplateFiles } from '../services/githubRepo.service.js';
+import { generateAndCommitAppIcons } from '../services/appIcon.service.js';
 import { getIo } from '../socket.js';
 
 const createWebsiteSchema = z.object({
@@ -670,150 +671,97 @@ export async function commitUpload(req, res, next) {
   }
 }
 
-// 5. Rename remote Flutter application files directly in-place
-export async function renameRemoteFlutterApp(req, res, next) {
+// 5. Update remote Flutter application settings (Name and/or Icons)
+export async function updateFlutterApp(req, res, next) {
   try {
     const { owner, repo } = req.params;
-    const { branch, flutterAppName } = req.body;
+    const { branch = 'main', newName, commitMessage } = req.body;
+    const file = req.file;
 
-    if (!branch) {
-      return res.status(400).json({ message: 'Branch is required' });
-    }
-    if (!flutterAppName) {
-      return res.status(400).json({ message: 'Flutter App Name is required' });
-    }
-
-    const cleanAppName = flutterAppName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
-    if (!cleanAppName) {
-      return res.status(400).json({ message: 'Invalid Flutter App Name' });
-    }
+    if (!branch) return res.status(400).json({ message: 'Branch is required' });
+    if (!newName && !file) return res.status(400).json({ message: 'Either newName or app icon is required' });
 
     const octokit = new Octokit({ auth: req.session.githubAccessToken });
-
-    // 1. Get branch ref
-    const refRes = await octokit.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${branch}`
-    });
-    const latestCommitSha = refRes.data.object.sha;
-
-    // 2. Get commit details
-    const commitRes = await octokit.git.getCommit({
-      owner,
-      repo,
-      commit_sha: latestCommitSha
-    });
-    const treeSha = commitRes.data.tree.sha;
-
-    // 3. Get recursive tree
-    const treeRes = await octokit.git.getTree({
-      owner,
-      repo,
-      tree_sha: treeSha,
-      recursive: '1'
-    });
+    const io = getIo();
+    const emitLog = (msg) => io.emit('upload_log', { repoFullName: `${owner}/${repo}`, message: msg });
+    const emitProgress = (progress, statusText) => io.emit('upload_progress', { repoFullName: `${owner}/${repo}`, progress, status: statusText });
 
     const finalTreeNodes = [];
-    let updatedFilesCount = 0;
+    let cleanAppName = null;
 
-    for (const node of treeRes.data.tree) {
-      if (node.type === 'blob') {
-        const pathLower = node.path.toLowerCase();
-        const isAppInfo = pathLower.endsWith('macos/runner/configs/appinfo.xcconfig');
-        const isManifest = pathLower.endsWith('android/app/src/main/androidmanifest.xml');
+    if (newName) {
+      cleanAppName = newName.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+      if (!cleanAppName) return res.status(400).json({ message: 'Invalid Flutter App Name' });
+    }
 
-        if (isAppInfo || isManifest) {
-          // Fetch existing blob content
-          const blobRes = await octokit.git.getBlob({
-            owner,
-            repo,
-            file_sha: node.sha
-          });
+    emitLog('Fetching current branch state...');
+    const refRes = await octokit.git.getRef({ owner, repo, ref: `heads/${branch}` });
+    const latestCommitSha = refRes.data.object.sha;
+
+    const commitRes = await octokit.git.getCommit({ owner, repo, commit_sha: latestCommitSha });
+    const baseTreeSha = commitRes.data.tree.sha;
+
+    if (cleanAppName) {
+      emitLog('Fetching remote file tree to rename app...');
+      const treeRes = await octokit.git.getTree({ owner, repo, tree_sha: baseTreeSha, recursive: '1' });
+      let updatedFilesCount = 0;
+      for (const node of treeRes.data.tree) {
+        if (node.type === 'blob') {
+          const pathLower = node.path.toLowerCase();
+          const isAppInfo = pathLower.endsWith('macos/runner/configs/appinfo.xcconfig');
+          const isManifest = pathLower.endsWith('android/app/src/main/androidmanifest.xml');
           
-          let content = Buffer.from(blobRes.data.content, blobRes.data.encoding).toString('utf8');
-          
-          if (isAppInfo) {
-            content = content.replace(/PRODUCT_NAME\s*=\s*[a-zA-Z0-9._-]+/g, `PRODUCT_NAME = ${cleanAppName}`);
-          } else if (isManifest) {
-            content = content.replace(/android:label="[^"]*"/g, `android:label="${cleanAppName}"`);
+          if (isAppInfo || isManifest) {
+            const blobRes = await octokit.git.getBlob({ owner, repo, file_sha: node.sha });
+            let content = Buffer.from(blobRes.data.content, blobRes.data.encoding).toString('utf8');
+            if (isAppInfo) content = content.replace(/PRODUCT_NAME\s*=\s*[a-zA-Z0-9._-]+/g, `PRODUCT_NAME = ${cleanAppName}`);
+            else if (isManifest) content = content.replace(/android:label="[^"]*"/g, `android:label="${cleanAppName}"`);
+
+            const newBlobRes = await octokit.git.createBlob({
+              owner, repo, content: Buffer.from(content, 'utf8').toString('base64'), encoding: 'base64'
+            });
+            finalTreeNodes.push({ path: node.path, mode: node.mode, type: 'blob', sha: newBlobRes.data.sha });
+            updatedFilesCount++;
+            emitLog(`Modified in-memory remote blob for ${node.path}`);
           }
-
-          // Create new blob
-          const newBlobRes = await octokit.git.createBlob({
-            owner,
-            repo,
-            content: Buffer.from(content, 'utf8').toString('base64'),
-            encoding: 'base64'
-          });
-
-          finalTreeNodes.push({
-            path: node.path,
-            mode: node.mode,
-            type: 'blob',
-            sha: newBlobRes.data.sha
-          });
-          updatedFilesCount++;
-          console.log(`[remote-rename] Modified in-memory remote blob for ${node.path}`);
-        } else {
-          // Keep existing blob unchanged
-          finalTreeNodes.push({
-            path: node.path,
-            mode: node.mode,
-            type: 'blob',
-            sha: node.sha
-          });
         }
       }
-    }
-
-    if (updatedFilesCount === 0) {
-      return res.status(404).json({
-        message: 'No Flutter configuration files found on the remote branch. Verify AppInfo.xcconfig or AndroidManifest.xml exists.'
-      });
-    }
-
-    // 4. Create new tree
-    const newTreeRes = await octokit.git.createTree({
-      owner,
-      repo,
-      tree: finalTreeNodes
-    });
-    const newTreeSha = newTreeRes.data.sha;
-
-    // 5. Create commit
-    const newCommitRes = await octokit.git.createCommit({
-      owner,
-      repo,
-      message: `Rename Flutter application to: ${cleanAppName} (direct remote update)`,
-      tree: newTreeSha,
-      parents: [latestCommitSha]
-    });
-    const newCommitSha = newCommitRes.data.sha;
-
-    // 6. Update ref
-    await octokit.git.updateRef({
-      owner,
-      repo,
-      ref: `heads/${branch}`,
-      sha: newCommitSha
-    });
-
-    res.json({
-      success: true,
-      message: `Remote Flutter application renamed to "${cleanAppName}" successfully.`,
-      commitSha: newCommitSha,
-      commitUrl: `https://github.com/${owner}/${repo}/commit/${newCommitSha}`,
-      branchUrl: `https://github.com/${owner}/${repo}/tree/${branch}`,
-      summary: {
-        added: 0,
-        modified: updatedFilesCount,
-        deleted: 0,
-        unchanged: treeRes.data.tree.length - updatedFilesCount,
-        ignored: 0,
-        renamedTo: cleanAppName
+      if (updatedFilesCount === 0) {
+         emitLog(`Warning: No Flutter configuration files found to rename on the remote branch.`);
       }
+    }
+
+    if (file) {
+      emitLog('Generating and uploading app icons...');
+      const iconBlobs = await generateAndCommitAppIcons({ owner, repo, branch, fileBuffer: file.buffer, accessToken: req.session.githubAccessToken });
+      finalTreeNodes.push(...iconBlobs);
+    }
+
+    if (finalTreeNodes.length === 0) {
+      return res.status(400).json({ message: 'No changes were generated.' });
+    }
+
+    emitLog('Creating commit tree...');
+    const newTreeRes = await octokit.git.createTree({ owner, repo, base_tree: baseTreeSha, tree: finalTreeNodes });
+    
+    emitLog('Finalizing commit...');
+    let autoMsg = [];
+    if (cleanAppName) autoMsg.push(`Rename App to ${cleanAppName}`);
+    if (file) autoMsg.push(`Update App Icons`);
+    const finalCommitMessage = commitMessage || autoMsg.join(' & ') + ` - ${new Date().toLocaleString()}`;
+
+    const newCommitRes = await octokit.git.createCommit({
+      owner, repo, message: finalCommitMessage, tree: newTreeRes.data.sha, parents: [latestCommitSha]
     });
+
+    emitLog('Updating branch reference...');
+    await octokit.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommitRes.data.sha });
+
+    emitLog('App settings successfully updated!');
+    emitProgress(100, 'Done');
+    
+    res.json({ success: true, message: 'App successfully updated.', commitSha: newCommitRes.data.sha });
+
   } catch (err) {
     next(err);
   }
