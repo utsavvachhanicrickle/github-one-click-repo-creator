@@ -10,6 +10,13 @@ export async function getRepoBranches(owner, repo) {
   return res.data;
 }
 
+export async function getRepoFile(owner, repo, path, branch) {
+  const params = new URLSearchParams({ path });
+  if (branch) params.append("branch", branch);
+  const res = await API.get(`/api/github/repos/${owner}/${repo}/file?${params.toString()}`);
+  return res.data;
+}
+
 export async function compareFolderUpload(owner, repo, formData) {
   const res = await API.post(`/api/github/repos/${owner}/${repo}/compare-upload`, formData);
   return res.data;

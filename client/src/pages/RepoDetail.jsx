@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2, Github, ShieldAlert, CheckCircle2, X, Plus } from '
 import FolderUpload from '../components/FolderUpload.jsx';
 import BranchSelector from '../components/BranchSelector.jsx';
 import AppUpdater from '../components/AppUpdater.jsx';
+import TextFileEditor from '../components/TextFileEditor.jsx';
 import { io } from 'socket.io-client';
 import { getRepoBranches, commitFolderUpload, createRepoBranch } from '../services/github.service.js';
 
@@ -231,7 +232,7 @@ export default function RepoDetail() {
           {/* Main Controls */}
           <div className="space-y-6">
             <div className="bg-(--bg-primary) border border-(--border) rounded-3xl p-6 shadow-xs space-y-6">
-              {/* {branchesLoading ? (
+              {branchesLoading ? (
                 <div className="flex items-center gap-3 text-sm text-(--text-secondary) py-4 select-none">
                   <Loader2 className="animate-spin text-(--primary)" size={20} />
                   Loading branches...
@@ -293,10 +294,10 @@ export default function RepoDetail() {
                     </div>
                   )}
                 </div>
-              )} */}
+              )}
 
               {/* Workspace Tabs */}
-              {/* <div className="flex border-b border-(--border) select-none pt-2">
+              <div className="flex border-b border-(--border) select-none pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -325,7 +326,21 @@ export default function RepoDetail() {
                 >
                   Flutter App Settings
                 </button>
-              </div> */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('text-editor');
+                    setError('');
+                  }}
+                  className={`flex-1 pb-3 text-xs font-black border-b-2 transition duration-200 cursor-pointer ${
+                    activeTab === 'text-editor'
+                      ? 'border-(--primary) text-(--primary)'
+                      : 'border-transparent text-(--text-secondary) hover:text-(--text-primary)'
+                  }`}
+                >
+                  Profile Editor
+                </button>
+              </div>
 
               {activeTab === 'upload' ? (
                 <div className="space-y-6 animate-in fade-in duration-200">
@@ -366,9 +381,9 @@ export default function RepoDetail() {
                     </label>
                   </div>
                 </div>
-              ) : (
+              ) : activeTab === 'flutter-rename' ? (
                 <div className="space-y-6 animate-in fade-in duration-200">
-                  <AppUpdater 
+                  <AppUpdater
                     owner={owner} 
                     repo={repo} 
                     currentBranch={selectedBranch}
@@ -395,7 +410,35 @@ export default function RepoDetail() {
                     }}
                   />
                 </div>
-              )}
+              ) : activeTab === 'text-editor' ? (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  <TextFileEditor 
+                    owner={owner} 
+                    repo={repo} 
+                    currentBranch={selectedBranch}
+                    setIsUploading={(val) => {
+                      setUploading(val);
+                      setCommitting(val);
+                      if (val) {
+                        setLogs([]);
+                        setUploadProgress(null);
+                        setSuccessResult(null);
+                        setError('');
+                      }
+                    }}
+                    setUploadStatus={(msg) => setLogs(prev => [...prev, { message: msg, type: 'info', timestamp: new Date().toISOString() }])}
+                    onComplete={() => {
+                      setUploading(false);
+                      setCommitting(false);
+                      setSuccessResult({
+                        commitUrl: `https://github.com/${owner}/${repo}/commit/HEAD`,
+                        branchUrl: `https://github.com/${owner}/${repo}/tree/${selectedBranch}`,
+                        summary: { added: 0, modified: 1, deleted: 0, unchanged: 0 }
+                      });
+                    }}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

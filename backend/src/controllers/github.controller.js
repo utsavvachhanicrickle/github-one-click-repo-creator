@@ -39,7 +39,6 @@ export async function createWebsiteRepo(req, res, next) {
       message:
         "Repository created successfully with automation template files.",
       repo: result,
-      fileCount: files.length,
       usedN8n: false,
     });
   } catch (err) {
@@ -1218,6 +1217,42 @@ export async function mergeForkBranch(req, res, next) {
       throw mergeErr;
     }
   } catch (err) {
+    next(err);
+  }
+}
+
+export async function getRepoFile(req, res, next) {
+  try {
+    const { owner, repo } = req.params;
+    const { path: filePath, branch } = req.query;
+
+    if (!filePath) {
+      return res.status(400).json({ message: "path query parameter is required" });
+    }
+
+    const octokit = new Octokit({ auth: req.session.githubAccessToken });
+
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: filePath,
+      ref: branch || "main",
+    });
+
+    if (Array.isArray(data)) {
+      return res.status(400).json({ message: "path points to a directory, not a file" });
+    }
+
+    const content = Buffer.from(data.content, "base64").toString("utf-8");
+
+    res.json({
+      content,
+      sha: data.sha,
+    });
+  } catch (err) {
+    if (err.status === 404) {
+      return res.status(404).json({ message: "File not found" });
+    }
     next(err);
   }
 }

@@ -62,7 +62,7 @@ export default function StoreCard({ store }) {
           </div>
         )}
       </div>
-
+{/* 
       <div>
         <div className="mt-4 pt-4 border-t border-(--border) flex items-center justify-between text-xs text-(--text-secondary) font-semibold">
           <div className="flex items-center gap-1.5" title="Creation Date">
@@ -80,7 +80,7 @@ export default function StoreCard({ store }) {
           View on GitHub
           <ExternalLink size={16} />
         </a>
-      </div>
+      </div> */}
     </div>
   );
 }
