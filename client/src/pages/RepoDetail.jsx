@@ -39,6 +39,7 @@ export default function RepoDetail() {
   const [socket, setSocket] = useState(null);
   const [logs, setLogs] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const logsEndRef = useRef(null);
 
   useEffect(() => {
@@ -53,6 +54,10 @@ export default function RepoDetail() {
 
     newSocket.on('upload_progress', (data) => {
       setLogs((prev) => [...prev, data]);
+    });
+
+    newSocket.on('upload_progress_percent', (data) => {
+      setUploadProgress(data);
     });
 
     return () => {
@@ -172,6 +177,7 @@ export default function RepoDetail() {
       setCommitting(true);
       setError('');
       setLogs([]);
+      setUploadProgress(null);
 
       const now = new Date();
       const dd = String(now.getDate()).padStart(2, '0');
@@ -219,7 +225,7 @@ export default function RepoDetail() {
     <div className="w-full min-h-screen bg-(--bg) pb-12">
       <div className="max-w-5xl mx-auto px-6 mt-8">
         <Link
-          to={`/id/${me?.unique_id}`}
+          to={me?.role === 'admin' ? `/admin/${me?.unique_id}` : `/id/${me?.unique_id}`}
           className="inline-flex items-center gap-2 text-xs font-bold text-(--text-secondary) hover:text-(--primary) transition duration-200 ease-in-out mb-6 select-none"
         >
           <ArrowLeft size={16} /> Back to Dashboard
@@ -256,7 +262,7 @@ export default function RepoDetail() {
           </div>
         )}
 
-        {successResult && (
+        {/* {successResult && (
           <div className="p-6 rounded-3xl bg-(--success-bg) border border-(--success-border) text-(--text-primary) mb-8 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-4">
               <CheckCircle2 className="text-(--success) shrink-0" size={24} />
@@ -314,13 +320,13 @@ export default function RepoDetail() {
               </div>
             </div>
           </div>
-        )}
+        )} */}
 
         <div className="max-w-3xl mx-auto">
           {/* Main Controls */}
           <div className="space-y-6">
             <div className="bg-(--bg-primary) border border-(--border) rounded-3xl p-6 shadow-xs space-y-6">
-              {branchesLoading ? (
+              {/* {branchesLoading ? (
                 <div className="flex items-center gap-3 text-sm text-(--text-secondary) py-4 select-none">
                   <Loader2 className="animate-spin text-(--primary)" size={20} />
                   Loading branches...
@@ -334,7 +340,6 @@ export default function RepoDetail() {
                     loading={committing || branchesLoading}
                   />
 
-                  {/* Create Branch Option */}
                   {!showNewBranchInput ? (
                     <button
                       onClick={() => setShowNewBranchInput(true)}
@@ -383,7 +388,7 @@ export default function RepoDetail() {
                     </div>
                   )}
                 </div>
-              )}
+              )} */}
 
               {/* Workspace Tabs */}
               <div className="flex border-b border-(--border) select-none pt-2">
@@ -495,49 +500,62 @@ export default function RepoDetail() {
           </div>
         </div>
 
-        {/* Live Upload Logs Modal popup */}
+        {/* Live Upload Status Modal popup */}
         {(uploading || logs.length > 0) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-(--bg-primary) border border-(--border) rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
-              <div className="px-6 py-4 border-b border-(--border) flex justify-between items-center bg-(--bg-secondary)/50">
-                <h3 className="text-sm font-bold text-(--text-primary) flex items-center gap-2 select-none">
-                  {committing ? (
-                    <Loader2 className="animate-spin text-(--primary)" size={16} />
-                  ) : (
-                    <CheckCircle2 className="text-(--success)" size={16} />
-                  )}
-                  Live Upload Logs
-                </h3>
-                {!committing && (
-                  <button
-                    onClick={() => {
-                      setUploading(false);
-                      setLogs([]);
-                    }}
-                    className="p-1.5 rounded-full hover:bg-(--bg-active) text-(--text-secondary) hover:text-(--text-primary) transition cursor-pointer"
-                  >
-                    <X size={18} />
-                  </button>
-                )}
-              </div>
+            <div className="bg-(--bg-primary) border border-(--border) rounded-3xl w-full max-w-md shadow-2xl overflow-hidden p-8 text-center">
               
-              <div className="flex-1 bg-black p-4 overflow-y-auto font-mono text-[10px] sm:text-xs text-gray-300 space-y-1 custom-scrollbar min-h-[300px]">
-                {logs.map((log, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <span className="text-gray-500 shrink-0 select-none">
-                      [{new Date(log.timestamp).toLocaleTimeString()}]
-                    </span>
-                    <span className={log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-blue-300'}>
-                      {log.message}
-                    </span>
+              <div className="flex justify-center mb-6">
+                {committing ? (
+                  <div className="w-16 h-16 rounded-full bg-(--primary)/10 flex items-center justify-center text-(--primary) shadow-inner relative">
+                    <Loader2 className="animate-spin" size={32} />
                   </div>
-                ))}
-                {logs.length === 0 && committing && (
-                  <div className="text-gray-500 italic">Waiting for backend response...</div>
+                ) : logs.length > 0 && logs[logs.length - 1].type === 'error' ? (
+                  <div className="w-16 h-16 rounded-full bg-(--danger)/10 flex items-center justify-center text-(--danger) shadow-inner">
+                    <X size={32} />
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-(--success)/10 flex items-center justify-center text-(--success) shadow-inner">
+                    <CheckCircle2 size={32} />
+                  </div>
                 )}
-                {/* Auto-scroll target */}
-                <div ref={logsEndRef} />
               </div>
+
+              <h3 className="text-xl font-black text-(--text-primary) mb-2">
+                {committing ? 'Uploading Project...' : logs.length > 0 && logs[logs.length - 1].type === 'error' ? 'Upload Failed' : 'Upload Complete!'}
+              </h3>
+              
+              <p className="text-sm font-medium text-(--text-secondary) mb-8 min-h-[40px] flex items-center justify-center">
+                {logs.length > 0 ? logs[logs.length - 1].message : 'Waiting for backend response...'}
+              </p>
+
+              {uploadProgress !== null && committing && (
+                <div className="mb-8">
+                  <div className="flex justify-between items-center text-xs font-bold text-(--text-secondary) mb-2">
+                    <span>Progress</span>
+                    <span>{uploadProgress.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-(--bg-secondary) rounded-full h-2 overflow-hidden shadow-inner">
+                    <div 
+                      className="bg-(--primary) h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!committing && (
+                <button
+                  onClick={() => {
+                    setUploading(false);
+                    setLogs([]);
+                    setUploadProgress(null);
+                  }}
+                  className="w-full bg-(--bg-secondary) hover:bg-(--bg-active) border border-(--border) text-(--text-primary) font-bold py-3.5 rounded-xl transition duration-200 ease-in-out text-sm"
+                >
+                  Close
+                </button>
+              )}
             </div>
           </div>
         )}

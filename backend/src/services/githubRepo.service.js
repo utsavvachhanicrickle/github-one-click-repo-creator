@@ -1,7 +1,26 @@
 import { Octokit } from '@octokit/rest';
+import axios from 'axios';
 
 function toBase64(content) {
+  if (Buffer.isBuffer(content)) return content.toString('base64');
   return Buffer.from(content, 'utf8').toString('base64');
+}
+
+export async function getAutomationTemplateFiles() {
+  const treeRes = await axios.get('https://api.github.com/repos/utsavvachhanicrickle/github_automation/git/trees/main?recursive=1');
+  const blobs = treeRes.data.tree.filter(node => node.type === 'blob');
+
+  const filePromises = blobs.map(async (blob) => {
+    const rawRes = await axios.get(`https://raw.githubusercontent.com/utsavvachhanicrickle/github_automation/main/${blob.path}`, {
+      responseType: 'arraybuffer'
+    });
+    return {
+      path: blob.path,
+      content: Buffer.from(rawRes.data)
+    };
+  });
+
+  return await Promise.all(filePromises);
 }
 
 export async function createRepoWithFiles({ accessToken, repoName, description, isPrivate, files }) {
@@ -86,7 +105,7 @@ export async function createRepoWithFiles({ accessToken, repoName, description, 
   const { data: commit } = await octokit.git.createCommit({
     owner,
     repo: repoName,
-    message: 'Initial website generated from builder',
+    message: `Initial website generated from builder - ${Date.now()}`,
     tree: tree.sha,
     parents: [baseCommitSha]
   });

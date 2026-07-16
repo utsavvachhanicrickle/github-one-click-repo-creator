@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import { Octokit } from '@octokit/rest';
 import crypto from 'crypto';
-import { createStarterWebsiteFiles } from '../services/starterTemplate.service.js';
-import { createRepoWithFiles } from '../services/githubRepo.service.js';
-import { User } from '../models/user.module.js';
+import { createRepoWithFiles, getAutomationTemplateFiles } from '../services/githubRepo.service.js';
 import { getIo } from '../socket.js';
 
 const createWebsiteSchema = z.object({
@@ -20,27 +18,20 @@ const createWebsiteSchema = z.object({
 export async function createWebsiteRepo(req, res, next) {
   try {
     const input = createWebsiteSchema.parse(req.body);
-    const user = req.session.githubUser;
+    // Fetch the files from the github_automation template
+    const files = await getAutomationTemplateFiles();
 
-    let files = [];
-
-    if (input.templateType !== 'blank') {
-      files = createStarterWebsiteFiles({
-        repoName: input.repoName,
-        username: user.login
-      });
-    }
-
+    // 3. Create the new repository and populate it with the downloaded files
     const result = await createRepoWithFiles({
       accessToken: req.session.githubAccessToken,
       repoName: input.repoName,
       description: input.description,
-      isPrivate: input.isPrivate,
+      isPrivate: true, 
       files
     });
 
     res.status(201).json({
-      message: 'Repository created successfully.',
+      message: 'Repository created successfully with automation template files.',
       repo: result,
       fileCount: files.length,
       usedN8n: false
@@ -50,7 +41,6 @@ export async function createWebsiteRepo(req, res, next) {
       return res.status(400).json({ message: err.errors[0]?.message || 'Invalid input' });
     }
 
-    // GitHub duplicate repo error commonly returns 422.
     if (err.status === 422) {
       return res.status(422).json({
         message: 'GitHub could not create this repo. The repo name may already exist in your account.'
@@ -543,15 +533,37 @@ export async function commitUpload(req, res, next) {
 
     emitLog(`Analyzing differences. Found ${filesToUpload.length} file(s) that need uploading.`);
 
+    let completedBlobs = 0;
+    const totalBlobs = filesToUpload.length;
+
+    if (totalBlobs > 0 && socketId) {
+      try {
+        getIo().to(socketId).emit('upload_progress_percent', { completed: 0, total: totalBlobs, percentage: 0 });
+      } catch (e) {}
+    }
+
     // Create blobs for changed files
-    const blobPromises = filesToUpload.map(async (item, index) => {
-      emitLog(`[${index + 1}/${filesToUpload.length}] Creating blob for ${item.path}...`);
+    const blobPromises = filesToUpload.map(async (item) => {
       const blobRes = await octokit.git.createBlob({
         owner,
         repo,
         content: item.file.buffer.toString('base64'),
         encoding: 'base64'
       });
+      
+      completedBlobs++;
+      if (socketId) {
+        try {
+          getIo().to(socketId).emit('upload_progress_percent', { 
+            completed: completedBlobs, 
+            total: totalBlobs,
+            percentage: Math.round((completedBlobs / totalBlobs) * 100)
+          });
+        } catch (e) {
+          console.warn('Socket error:', e);
+        }
+      }
+
       return {
         path: item.path,
         sha: blobRes.data.sha
