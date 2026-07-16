@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { Octokit } from "@octokit/rest";
 import crypto from "crypto";
-import {
-  createRepoWithFiles,
-  getAutomationTemplateFiles,
-} from "../services/githubRepo.service.js";
+import { cloneRepoWithHistory } from "../services/githubRepo.service.js";
 import { generateAndCommitAppIcons } from "../services/appIcon.service.js";
 import { getIo } from "../socket.js";
 
@@ -29,16 +26,13 @@ const createWebsiteSchema = z.object({
 export async function createWebsiteRepo(req, res, next) {
   try {
     const input = createWebsiteSchema.parse(req.body);
-    // Fetch the files from the flutter_demo template
-    const files = await getAutomationTemplateFiles();
-
-    // 3. Create the new repository and populate it with the downloaded files
-    const result = await createRepoWithFiles({
+    // 3. Create the new repository using the true clone approach
+    const result = await cloneRepoWithHistory({
       accessToken: req.session.githubAccessToken,
       repoName: input.repoName,
       description: input.description,
       isPrivate: true,
-      files,
+      sourceRepoUrl: "https://github.com/utsavvachhanicrickle/flutter_demo.git"
     });
 
     res.status(201).json({

@@ -1,141 +1,74 @@
 import { Octokit } from "@octokit/rest";
-import axios from "axios";
+import { exec } from "child_process";
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
 
-function toBase64(content) {
-  if (Buffer.isBuffer(content)) return content.toString("base64");
-  return Buffer.from(content, "utf8").toString("base64");
-}
-
-export async function getAutomationTemplateFiles() {
-  const treeRes = await axios.get(
-    "https://api.github.com/repos/utsavvachhanicrickle/flutter_demo/git/trees/main?recursive=1",
-  );
-  const blobs = treeRes.data.tree.filter((node) => node.type === "blob");
-
-  const filePromises = blobs.map(async (blob) => {
-    const rawRes = await axios.get(
-      `https://raw.githubusercontent.com/utsavvachhanicrickle/flutter_demo/main/${blob.path}`,
-      {
-        responseType: "arraybuffer",
-      },
-    );
-    return {
-      path: blob.path,
-      content: Buffer.from(rawRes.data),
-    };
-  });
-
-  return await Promise.all(filePromises);
-}
-
-export async function createRepoWithFiles({
-  accessToken,
-  repoName,
-  description,
-  isPrivate,
-  files,
-}) {
+export async function cloneRepoWithHistory({ accessToken, repoName, description, isPrivate, sourceRepoUrl }) {
   const octokit = new Octokit({ auth: accessToken });
 
+  // 1. Get authenticated user details
   const { data: user } = await octokit.users.getAuthenticated();
   const owner = user.login;
 
-  // If no files are specified, automatically seed a README.md file
-  let activeFiles = files;
-  if (!Array.isArray(activeFiles) || activeFiles.length === 0) {
-    activeFiles = [
-      {
-        path: "README.md",
-        content: `# ${repoName}\n\n${description || "A new GitHub repository created using RepoSync."}\n\n---\n*Created automatically with [RepoSync](https://github.com/utsavvachhanicrickle/github-one-click-repo-creator).*`,
-      },
-    ];
-  }
-
-  const hasFiles = true;
-
-  // Create repository. Set auto_init to true to seed initial commit ref.
+  // 2. Create a new empty repository via GitHub API
   const { data: repo } = await octokit.repos.createForAuthenticatedUser({
     name: repoName,
-    description,
+    description: description || "",
     private: isPrivate,
-    auto_init: true,
+    auto_init: false, // Must be false so we can mirror push directly
     has_issues: true,
     has_projects: false,
     has_wiki: false,
   });
 
-  // Wait a short moment for the repository database to be provisioned and ready on GitHub.
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  // 3. Create a temporary directory for the clone
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "repo-sync-"));
 
-  const defaultBranch = repo.default_branch || "main";
-
-  // Get the latest commit SHA of the default branch
-  const { data: ref } = await octokit.git.getRef({
-    owner,
-    repo: repoName,
-    ref: `heads/${defaultBranch}`,
-  });
-  const baseCommitSha = ref.object.sha;
-
-  // Get the base tree SHA of the initial commit
-  const { data: baseCommit } = await octokit.git.getCommit({
-    owner,
-    repo: repoName,
-    commit_sha: baseCommitSha,
-  });
-  const baseTreeSha = baseCommit.tree.sha;
-
-  // Build website files.
-  const treeItems = [];
-
-  for (const file of activeFiles) {
-    const { data: blob } = await octokit.git.createBlob({
-      owner,
-      repo: repoName,
-      content: toBase64(file.content),
-      encoding: "base64",
+  try {
+    // 4. Git clone --bare from the source URL
+    await new Promise((resolve, reject) => {
+      exec(`git clone --bare ${sourceRepoUrl} .`, { cwd: tmpDir }, (error, stdout, stderr) => {
+        if (error) return reject(new Error(`Failed to clone template repository: ${error.message}`));
+        resolve();
+      });
     });
 
-    treeItems.push({
-      path: file.path,
-      mode: "100644",
-      type: "blob",
-      sha: blob.sha,
+    // 5. Git push --mirror to the new repository with the access token for auth
+    const newRepoUrl = `https://x-access-token:${accessToken}@github.com/${owner}/${repoName}.git`;
+    await new Promise((resolve, reject) => {
+      exec(`git push --mirror ${newRepoUrl}`, { cwd: tmpDir }, (error, stdout, stderr) => {
+        if (error) return reject(new Error(`Failed to push mirrored repository: ${error.message}`));
+        resolve();
+      });
     });
+  } finally {
+    // 6. Clean up the temporary directory
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(console.error);
   }
 
-  // Create new tree using the base tree (appends/replaces files)
-  const { data: tree } = await octokit.git.createTree({
-    owner,
-    repo: repoName,
-    tree: treeItems,
-    base_tree: baseTreeSha,
-  });
+  // 7. Get final details to return
+  const { data: updatedRepo } = await octokit.repos.get({ owner, repo: repoName });
+  const defaultBranch = updatedRepo.default_branch || "main";
 
-  // Create commit with base commit as parent
-  const { data: commit } = await octokit.git.createCommit({
-    owner,
-    repo: repoName,
-    message: `Initial website generated from builder - ${Date.now()}`,
-    tree: tree.sha,
-    parents: [baseCommitSha],
-  });
-
-  // Update default branch reference to point to our new commit
-  await octokit.git.updateRef({
-    owner,
-    repo: repoName,
-    ref: `heads/${defaultBranch}`,
-    sha: commit.sha,
-    force: true,
-  });
+  let commitSha = "";
+  try {
+    const { data: ref } = await octokit.git.getRef({
+      owner,
+      repo: repoName,
+      ref: `heads/${defaultBranch}`,
+    });
+    commitSha = ref.object.sha;
+  } catch (e) {
+    console.warn("Failed to get commit SHA after mirror push:", e.message);
+  }
 
   return {
-    owner,
     repoName,
-    htmlUrl: repo.html_url,
-    cloneUrl: repo.clone_url,
+    owner,
+    htmlUrl: updatedRepo.html_url,
+    cloneUrl: updatedRepo.clone_url,
     defaultBranch,
-    commitSha: commit.sha,
+    commitSha,
   };
 }
