@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { cloneRepoWithHistory } from "../services/githubRepo.service.js";
 import { generateAndCommitAppIcons } from "../services/appIcon.service.js";
 import { getIo } from "../socket.js";
+import { config, getHeaders } from "../config.js";
 
 const createWebsiteSchema = z.object({
   repoName: z
@@ -32,7 +33,7 @@ export async function createWebsiteRepo(req, res, next) {
       repoName: input.repoName,
       description: input.description,
       isPrivate: true,
-      sourceRepoUrl: "https://github.com/utsavvachhanicrickle/flutter_demo.git"
+      sourceRepoUrl: "https://github.com/utsavvachhanicrickle/flutter_demo.git",
     });
 
     res.status(201).json({
@@ -294,11 +295,9 @@ export async function compareUpload(req, res, next) {
 
     const maxFiles = 500;
     if (uploadedFiles.length > maxFiles) {
-      return res
-        .status(400)
-        .json({
-          message: `Max upload limit exceeded (Max: ${maxFiles} files)`,
-        });
+      return res.status(400).json({
+        message: `Max upload limit exceeded (Max: ${maxFiles} files)`,
+      });
     }
 
     const validUploadedFiles = [];
@@ -422,13 +421,11 @@ export async function commitUpload(req, res, next) {
     const emitLog = (message, type = "info") => {
       if (socketId) {
         try {
-          getIo()
-            .to(socketId)
-            .emit("upload_progress", {
-              message,
-              type,
-              timestamp: new Date().toISOString(),
-            });
+          getIo().to(socketId).emit("upload_progress", {
+            message,
+            type,
+            timestamp: new Date().toISOString(),
+          });
         } catch (e) {
           console.warn("Socket error:", e);
         }
@@ -457,11 +454,9 @@ export async function commitUpload(req, res, next) {
 
     const maxFiles = 500;
     if (uploadedFiles.length > maxFiles) {
-      return res
-        .status(400)
-        .json({
-          message: `Max upload limit exceeded (Max: ${maxFiles} files)`,
-        });
+      return res.status(400).json({
+        message: `Max upload limit exceeded (Max: ${maxFiles} files)`,
+      });
     }
 
     const validUploadedFiles = [];
@@ -607,13 +602,11 @@ export async function commitUpload(req, res, next) {
 
     if (totalBlobs > 0 && socketId) {
       try {
-        getIo()
-          .to(socketId)
-          .emit("upload_progress_percent", {
-            completed: 0,
-            total: totalBlobs,
-            percentage: 0,
-          });
+        getIo().to(socketId).emit("upload_progress_percent", {
+          completed: 0,
+          total: totalBlobs,
+          percentage: 0,
+        });
       } catch (e) {}
     }
 
@@ -1227,7 +1220,9 @@ export async function getRepoFile(req, res, next) {
     const { path: filePath, branch } = req.query;
 
     if (!filePath) {
-      return res.status(400).json({ message: "path query parameter is required" });
+      return res
+        .status(400)
+        .json({ message: "path query parameter is required" });
     }
 
     const octokit = new Octokit({ auth: req.session.githubAccessToken });
@@ -1240,7 +1235,9 @@ export async function getRepoFile(req, res, next) {
     });
 
     if (Array.isArray(data)) {
-      return res.status(400).json({ message: "path points to a directory, not a file" });
+      return res
+        .status(400)
+        .json({ message: "path points to a directory, not a file" });
     }
 
     const content = Buffer.from(data.content, "base64").toString("utf-8");
@@ -1254,5 +1251,234 @@ export async function getRepoFile(req, res, next) {
       return res.status(404).json({ message: "File not found" });
     }
     next(err);
+  }
+}
+
+export async function getRepoFileManually(req, res) {
+  const { owner, repo } = req.params;
+  const { path: filePath, branch } = req.query;
+
+  if (!filePath) {
+    return res
+      .status(400)
+      .json({ message: "path query parameter is required" });
+  }
+
+  const encodedPath = encodeURIComponent(filePath);
+  const url =
+    `${config.githubApiUrl}/repos/${owner}/${repo}/contents/${encodedPath}` +
+    `?ref=${encodeURIComponent(branch)}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      return res
+        .status(response.status)
+        .json({ message: `GitHub API error: ${response.statusText}` });
+    }
+
+    const data = await response.json();
+
+    console.log(data);
+
+    if (Array.isArray(data)) {
+      return res
+        .status(400)
+        .json({ message: "path points to a directory, not a file" });
+    }
+
+    const content = Buffer.from(data.content, "base64").toString("utf-8");
+
+    console.log(content);
+
+    res.json({
+      content,
+      sha: data.sha,
+    });
+  } catch (error) {
+    console.error("Error fetching file:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+export async function manuallyCommit(req, res) {
+  try {
+    const { owner, repo } = req.params;
+    const {
+      branch,
+      commitMessage,
+      includeDeletions = "false",
+      socketId,
+    } = req.body;
+
+     const emitLog = (message, type = "info") => {
+      if (socketId) {
+        try {
+          getIo().to(socketId).emit("upload_progress", {
+            message,
+            type,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.warn("Socket error:", e);
+        }
+      }
+    };
+
+    if (!branch) {
+      return res.status(400).json({ message: "Branch is required" });
+    }
+
+    emitLog(
+      `Starting upload process for repository: ${owner}/${repo} on branch ${branch}...`,
+    );
+
+    const uploadedFiles = req.files || [];
+
+    let relativePaths = [];
+    if (req.body.paths) {
+      try {
+        relativePaths = JSON.parse(req.body.paths);
+      } catch (e) {
+        console.warn("Failed to parse paths JSON", e);
+      }
+    }
+
+    const maxFiles = 500;
+    if (uploadedFiles.length > maxFiles) {
+      return res.status(400).json({
+        message: `Max upload limit exceeded (Max: ${maxFiles} files)`,
+      });
+    }
+
+    const validUploadedFiles = [];
+    let ignoredCount = 0;
+
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const relPath = relativePaths[i] || file.originalname || file.name;
+
+      if (isIgnoredOrDangerousPath(relPath)) {
+        ignoredCount++;
+        continue;
+      }
+
+      validUploadedFiles.push({
+        file,
+        path: relPath.replace(/\\/g, "/"),
+        sha: calculateGitSha(file.buffer),
+      });
+    }
+
+    const flutterAppName = req.body.flutterAppName;
+    const renamedTo = processFlutterRenames(validUploadedFiles, flutterAppName);
+
+    emitLog(
+      `Processed ${validUploadedFiles.length} files (Ignored ${ignoredCount} invalid/system files). Fetching latest branch state...`,
+    );
+
+    let latestCommitSha = null;
+    let isInitialCommit = false;
+
+    try {
+      // 1. Get the latest commit SHA of the branch
+      const refUrl = `${config.githubApiUrl}/repos/${owner}/${repo}/git/refs/heads/${branch}`;
+      const refRes = await fetch(refUrl, { headers: getHeaders() });
+      if (!refRes.ok) throw new Error(`Failed to get ref: ${refRes.statusText}`);
+      const refData = await refRes.json();
+      latestCommitSha = refData.object.sha;
+
+      // 2. Get the base tree SHA
+      const commitUrl = `${config.githubApiUrl}/repos/${owner}/${repo}/git/commits/${latestCommitSha}`;
+      const commitRes = await fetch(commitUrl, { headers: getHeaders() });
+      if (!commitRes.ok) throw new Error(`Failed to get commit: ${commitRes.statusText}`);
+      const commitData = await commitRes.json();
+      const baseTreeSha = commitData.tree.sha;
+
+      // 3. Create blobs for each validUploadedFile
+      const treeItems = [];
+      for (const item of validUploadedFiles) {
+        emitLog(`Uploading ${item.path}...`);
+        const blobUrl = `${config.githubApiUrl}/repos/${owner}/${repo}/git/blobs`;
+        const blobRes = await fetch(blobUrl, {
+          method: "POST",
+          headers: { ...getHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: item.file.buffer.toString("base64"),
+            encoding: "base64"
+          })
+        });
+        if (!blobRes.ok) throw new Error(`Failed to create blob for ${item.path}`);
+        const blobData = await blobRes.json();
+        
+        treeItems.push({
+          path: item.path,
+          mode: "100644",
+          type: "blob",
+          sha: blobData.sha
+        });
+      }
+
+      if (treeItems.length === 0) {
+        return res.status(400).json({ success: false, message: "No valid files to upload" });
+      }
+
+      // 4. Create new tree
+      emitLog("Creating new tree...");
+      const treeUrl = `${config.githubApiUrl}/repos/${owner}/${repo}/git/trees`;
+      const newTreeRes = await fetch(treeUrl, {
+        method: "POST",
+        headers: { ...getHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          base_tree: baseTreeSha,
+          tree: treeItems
+        })
+      });  
+      if (!newTreeRes.ok) throw new Error("Failed to create tree");
+      const newTreeData = await newTreeRes.json();
+
+      // 5. Create new commit
+      emitLog("Creating new commit...");
+      const newCommitUrl = `${config.githubApiUrl}/repos/${owner}/${repo}/git/commits`;
+      const newCommitRes = await fetch(newCommitUrl, {
+        method: "POST",
+        headers: { ...getHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: commitMessage || `Update files via manual commit - ${new Date().toLocaleString()}`,
+          tree: newTreeData.sha,
+          parents: [latestCommitSha]
+        })
+      });
+      if (!newCommitRes.ok) throw new Error("Failed to create commit");
+      const newCommitData = await newCommitRes.json();
+
+      // 6. Update reference
+      emitLog("Updating branch reference...");
+      const updateRefUrl = `${config.githubApiUrl}/repos/${owner}/${repo}/git/refs/heads/${branch}`;
+      const updateRefRes = await fetch(updateRefUrl, {
+        method: "PATCH",
+        headers: { ...getHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sha: newCommitData.sha,
+          force: true
+        })
+      });
+      if (!updateRefRes.ok) throw new Error("Failed to update ref");
+
+      emitLog("Upload completed successfully!", "success");
+      return res.json({ success: true, commitUrl: newCommitData.html_url });
+      
+    } catch (error) {
+      console.error(error);
+      emitLog(`Commit failed: ${error.message}`, "error");
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to commit" });
   }
 }

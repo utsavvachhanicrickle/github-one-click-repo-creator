@@ -12,7 +12,9 @@ import {
   compareForkBranch,
   mergeForkBranch,
   updateFlutterApp,
-  getRepoFile
+  getRepoFile,
+  getRepoFileManually,
+  manuallyCommit
 } from '../controllers/github.controller.js';
 
 const router = express.Router();
@@ -40,5 +42,7 @@ router.post('/repos/:owner/:repo/compare-upload', requireGithubLogin, upload.any
 router.post('/repos/:owner/:repo/commit-upload', requireGithubLogin, upload.any(), commitUpload);
 router.post('/repos/:owner/:repo/update-flutter-app', requireGithubLogin, upload.single('icon'), updateFlutterApp);
 router.get('/repos/:owner/:repo/file', requireGithubLogin, getRepoFile);
+router.get('/repos/:owner/:repo/manually-get-file/file', requireGithubLogin, getRepoFileManually);
+router.post('/repos/:owner/:repo/manually-commit', requireGithubLogin, upload.any(), manuallyCommit);
 
 export default router;

@@ -13,7 +13,7 @@ export async function getRepoBranches(owner, repo) {
 export async function getRepoFile(owner, repo, path, branch) {
   const params = new URLSearchParams({ path });
   if (branch) params.append("branch", branch);
-  const res = await API.get(`/api/github/repos/${owner}/${repo}/file?${params.toString()}`);
+  const res = await API.get(`/api/github/repos/${owner}/${repo}/manually-get-file/file?${params.toString()}`);
   return res.data;
 }
 
@@ -23,7 +23,7 @@ export async function compareFolderUpload(owner, repo, formData) {
 }
 
 export async function commitFolderUpload(owner, repo, formData) {
-  const res = await API.post(`/api/github/repos/${owner}/${repo}/commit-upload`, formData);
+  const res = await API.post(`/api/github/repos/${owner}/${repo}/manually-commit`, formData);
   return res.data;
 }
 

@@ -209,7 +209,7 @@ export default function RepoDetail() {
                 Owner: <span className="font-semibold text-(--text-primary)">@{owner}</span>
               </p>
             </div>
-            <a
+            {/* <a
               href={`https://github.com/${owner}/${repo}`}
               target="_blank"
               rel="noreferrer"
@@ -217,7 +217,7 @@ export default function RepoDetail() {
             >
               <Github size={18} />
               Open on GitHub
-            </a>
+            </a> */}
           </div>
         </div>
 
@@ -232,7 +232,7 @@ export default function RepoDetail() {
           {/* Main Controls */}
           <div className="space-y-6">
             <div className="bg-(--bg-primary) border border-(--border) rounded-3xl p-6 shadow-xs space-y-6">
-              {branchesLoading ? (
+              {/* {branchesLoading ? (
                 <div className="flex items-center gap-3 text-sm text-(--text-secondary) py-4 select-none">
                   <Loader2 className="animate-spin text-(--primary)" size={20} />
                   Loading branches...
@@ -294,7 +294,7 @@ export default function RepoDetail() {
                     </div>
                   )}
                 </div>
-              )}
+              )} */}
 
               {/* Workspace Tabs */}
               <div className="flex border-b border-(--border) select-none pt-2">
