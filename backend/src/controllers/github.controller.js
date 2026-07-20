@@ -1348,7 +1348,7 @@ export async function manuallyCommit(req, res) {
       }
     }
 
-    const maxFiles = 500;
+    const maxFiles = 5000;
     if (uploadedFiles.length > maxFiles) {
       return res.status(400).json({
         message: `Max upload limit exceeded (Max: ${maxFiles} files)`,
@@ -1374,15 +1374,11 @@ export async function manuallyCommit(req, res) {
       });
     }
 
-    const flutterAppName = req.body.flutterAppName;
-    const renamedTo = processFlutterRenames(validUploadedFiles, flutterAppName);
-
     emitLog(
       `Processed ${validUploadedFiles.length} files (Ignored ${ignoredCount} invalid/system files). Fetching latest branch state...`,
     );
 
     let latestCommitSha = null;
-    let isInitialCommit = false;
 
     try {
       // 1. Get the latest commit SHA of the branch
@@ -1399,9 +1395,53 @@ export async function manuallyCommit(req, res) {
       const commitData = await commitRes.json();
       const baseTreeSha = commitData.tree.sha;
 
-      // 3. Create blobs for each validUploadedFile
-      const treeItems = [];
+      // Fetch the full remote tree to compare files
+      const treeFetchUrl = `${config.githubApiUrl}/repos/${owner}/${repo}/git/trees/${baseTreeSha}?recursive=1`;
+      const remoteTreeRes = await fetch(treeFetchUrl, { headers: getHeaders() });
+      let remoteBlobs = [];
+      if (remoteTreeRes.ok) {
+        const remoteTreeData = await remoteTreeRes.json();
+        remoteBlobs = remoteTreeData.tree.filter((node) => node.type === "blob");
+      }
+      const remoteFilesMap = new Map(remoteBlobs.map((node) => [node.path, node]));
+
+      // Filter files to upload
+      const filesToUpload = [];
+      const unchangedPaths = [];
       for (const item of validUploadedFiles) {
+        if (!remoteFilesMap.has(item.path)) {
+          filesToUpload.push(item);
+        } else {
+          const remoteNode = remoteFilesMap.get(item.path);
+          if (remoteNode.sha !== item.sha) {
+            filesToUpload.push(item);
+          } else {
+            unchangedPaths.push(item.path);
+          }
+        }
+      }
+
+      // Calculate local paths for deletion check
+      const localPaths = new Set(validUploadedFiles.map(f => f.path));
+      
+      const deletedPaths = [];
+      for (const remoteBlob of remoteBlobs) {
+        if (!localPaths.has(remoteBlob.path) && !isIgnoredOrDangerousPath(remoteBlob.path)) {
+          deletedPaths.push(remoteBlob.path);
+        }
+      }
+
+      const actuallyDeleting = includeDeletions === "true";
+
+      if (filesToUpload.length === 0 && (!actuallyDeleting || deletedPaths.length === 0)) {
+        return res.status(400).json({ success: false, message: "No changes detected. Uploaded files are identical to the remote branch files." });
+      }
+
+      emitLog(`Found ${filesToUpload.length} file(s) that need uploading. (${unchangedPaths.length} unchanged). ${actuallyDeleting ? deletedPaths.length + ' file(s) to delete.' : ''}`);
+
+      // 3. Create blobs for ONLY modified/new files
+      const newBlobsMap = new Map();
+      for (const item of filesToUpload) {
         emitLog(`Uploading ${item.path}...`);
         const blobUrl = `${config.githubApiUrl}/repos/${owner}/${repo}/git/blobs`;
         const blobRes = await fetch(blobUrl, {
@@ -1414,17 +1454,36 @@ export async function manuallyCommit(req, res) {
         });
         if (!blobRes.ok) throw new Error(`Failed to create blob for ${item.path}`);
         const blobData = await blobRes.json();
-        
-        treeItems.push({
-          path: item.path,
-          mode: "100644",
-          type: "blob",
-          sha: blobData.sha
+        newBlobsMap.set(item.path, blobData.sha);
+      }
+
+      // Build the final tree
+      const finalTreeNodes = [];
+      
+      // Keep unchanged remote blobs
+      for (const remoteBlob of remoteBlobs) {
+        if (actuallyDeleting && deletedPaths.includes(remoteBlob.path)) {
+          continue; // Skip adding this file to delete it
+        }
+        if (newBlobsMap.has(remoteBlob.path)) {
+          continue; // Will add the updated version below
+        }
+        finalTreeNodes.push({
+          path: remoteBlob.path,
+          mode: remoteBlob.mode,
+          type: remoteBlob.type,
+          sha: remoteBlob.sha
         });
       }
 
-      if (treeItems.length === 0) {
-        return res.status(400).json({ success: false, message: "No valid files to upload" });
+      // Add the new/updated blobs
+      for (const [path, sha] of newBlobsMap.entries()) {
+        finalTreeNodes.push({
+          path,
+          mode: "100644",
+          type: "blob",
+          sha
+        });
       }
 
       // 4. Create new tree
@@ -1434,8 +1493,7 @@ export async function manuallyCommit(req, res) {
         method: "POST",
         headers: { ...getHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
-          base_tree: baseTreeSha,
-          tree: treeItems
+          tree: finalTreeNodes
         })
       });  
       if (!newTreeRes.ok) throw new Error("Failed to create tree");
